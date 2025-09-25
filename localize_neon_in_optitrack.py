@@ -149,7 +149,7 @@ for pose in apriltags.tag_poses:
     display_surface.add_tag_pose(pose)
 
 # build the surface from the tags
-display_surface.build_surface()
+display_surface.build_surface(neon.pose_in_tags[0].position)
 
 # find neon's pose in local surface coordinate system
 # NOTE: the local surface coordinate system follows the conventions of our SVD method in `fit_plane`

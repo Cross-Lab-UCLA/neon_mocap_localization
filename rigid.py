@@ -1,12 +1,27 @@
 import numpy as np
 
 
-def fit_plane(centers):
+def fit_plane(centers, orient_towards=None):
     centroid = np.mean(centers, axis=1, keepdims=True)
     centered = centers - centroid
 
     # SVD on 3xN centered points
     U, _, _ = np.linalg.svd(centered)
+
+    normal = U[:, 2]
+    normal /= np.linalg.norm(normal)
+
+    if orient_towards is not None:
+        orient_towards = np.asarray(orient_towards, dtype=float)
+
+        if orient_towards.ndim == 1:
+            orient_towards = orient_towards[:, np.newaxis]
+        ref_vec = orient_towards.mean(axis=1) - centroid.squeeze()
+
+        if np.dot(normal, ref_vec) < 0:
+            normal = -normal
+
+        U[:, 2] = normal
 
     return centroid, U
 

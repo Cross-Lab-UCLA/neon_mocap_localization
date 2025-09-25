@@ -14,10 +14,10 @@ class Surface:
         self.tag_poses.append(pose)
         self.surface_corners.append(pose.position)
 
-    def build_surface(self):
+    def build_surface(self, orient_towards):
         centers = np.stack([pose.position for pose in self.tag_poses], axis=1)
 
-        centroid, R = fit_plane(centers)
+        centroid, R = fit_plane(centers, orient_towards)
 
         self.x_axis = R[:, 0]  # first column = x-axis of best-fit plane
         self.y_axis = R[:, 1]  # second column = y-axis of best-fit
