@@ -22,35 +22,28 @@ from plots import (
 )
 from pose import Pose
 
-# parser = argparse.ArgumentParser(
-#     description="Determines relative position of Neon scene camera in MoCap coordinate system"
-# )
-# parser.add_argument(
-#     "-r",
-#     "--neon_rec_path",
-#     help="The path to the Neon Native Recording Data",
-#     required=True,
-# )
-# parser.add_argument(
-#     "-m",
-#     "--mocap_path",
-#     help="The path to the MoCap data (CSV; in Neon timebase)",
-#     required=True,
-# )
+parser = argparse.ArgumentParser(
+    description="Determines relative position of Neon scene camera in MoCap coordinate system"
+)
+parser.add_argument(
+    "-r",
+    "--neon_rec_path",
+    help="The path to the Neon Native Recording Data",
+    required=True,
+)
+parser.add_argument(
+    "-m",
+    "--mocap_path",
+    help="The path to the MoCap data (CSV; in Neon timebase)",
+    required=True,
+)
 
-# args = vars(parser.parse_args())
+args = vars(parser.parse_args())
 
 # # load data
 
-# neon_rec = plnr.open(args["neon_rec_path"])
-# marker_positions = pd.read_csv(args["mocap_path"])
-
-# debug data
-
-neon_rec = plnr.open(
-    "Static_Test-20251028T211908Z-1-001/Static_Test/Native Recording Data/static_test_2025-10-14_12-16-38-eae4a97c/"
-)
-marker_positions = pd.read_csv("marker_positions.csv")
+neon_rec = plnr.open(args["neon_rec_path"])
+marker_positions = pd.read_csv(args["mocap_path"])
 
 # get an apriltag image from Neon recording
 # for now, we just test with a single image
@@ -64,7 +57,7 @@ neon_timestamp = neon_rec.scene.time[nframes // 2 + 100]
 neon = Neon(recording=neon_rec)
 
 # matrix that converts between coordinate systems of Neon and MoCap
-# (when following our recommendations in README.md)
+# (when following our recommendations in README.md).
 # y and z are swapped and vertical is reversed
 R_apriltag_to_mocap = np.array(
     [

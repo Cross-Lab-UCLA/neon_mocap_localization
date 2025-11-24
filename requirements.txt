@@ -1,5 +1,8 @@
 numpy
 pandas
 matplotlib
+pyxdf
+scipy
 opencv-python
 pupil-apriltags
+pupil-labs-neon-recording

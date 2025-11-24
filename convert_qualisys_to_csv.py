@@ -133,7 +133,7 @@ parser.add_argument(
     "-x", "--xdf_path", help="The XDF file produced by Lab Streaming Layer"
 )
 parser.add_argument(
-    "-nm", "--neon_markers", help="The number of markers on the wearers head", default=6
+    "-n", "--neon_markers", help="The number of markers on the wearers head", default=6
 )
 parser.add_argument(
     "-o",

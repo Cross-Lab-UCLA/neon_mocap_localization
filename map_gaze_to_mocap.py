@@ -3,18 +3,18 @@ from scipy.spatial.transform import Rotation as R
 
 # Load `neon_relative_pose` as follows:
 #
-# optitrack_transform = []
+# mocap_transform = []
 # with open("neon_camera_pose_relative_to_markers.json", "r") as f:
-#     optitrack_transform = json.load(f)
+#     mocap_transform = json.load(f)
 #     neon_relative_pose = Pose(
-#         position=optitrack_transform["position"],
-#         rotation=optitrack_transform["rotation"],
+#         position=mocap_transform["position"],
+#         rotation=mocap_transform["rotation"],
 #     )
 
 
 # azimuth & elevation as provided by Neon's gaze.csv:
 # https://docs.pupil-labs.com/neon/data-collection/data-format/#gaze-csv
-def map_gaze_to_optitrack(
+def map_gaze_to_mocap(
     neon_relative_pose,
     azimuth,
     elevation,
@@ -30,9 +30,9 @@ def map_gaze_to_optitrack(
 
     gaze_vector = neon_relative_pose.rotation.apply(gaze_vector)
 
-    gaze_in_optitrack = {
+    gaze_in_mocap = {
         "position": neon_relative_pose.position + avg_neon_marker_positions,
         "direction": gaze_vector,
     }
 
-    return gaze_in_optitrack
+    return gaze_in_mocap
