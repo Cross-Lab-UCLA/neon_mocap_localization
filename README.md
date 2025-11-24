@@ -35,7 +35,7 @@ The localization script requires the following two things:
 Make sure to label the IR markers as follows:
 
 - All markers for a given AprilTag should follow the format: `T1TL`,
-  where `T1` means `tag 1` and `TL` means the `t`op `l`eft corner of
+  where `T1` means `tag 1` and `TL` means the `T`op `L`eft corner of
   that tag. The other labels should be as follows:
    - `T1TR` -> tag 1; top right
    - `T1BR` -> tag 1; bottom right
@@ -59,7 +59,8 @@ you need to take specific steps for time sync:
   - Once LSL is installed, start LabRecorder and instruct it to
     collect data from [Neon's LSL Gaze
     Stream](https://docs.pupil-labs.com/neon/data-collection/lab-streaming-layer/),
-    as well as Qualisys's MoCap streams.
+    as well as [Qualisys's MoCap LSL
+    streams](https://github.com/qualisys/qualisys_lsl_app).
 - Then, run `convert_qualisys_to_csv.py`, providing also the XDF file
   that was produced by LSL.
 
