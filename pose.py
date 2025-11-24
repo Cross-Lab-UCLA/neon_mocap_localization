@@ -15,24 +15,16 @@ class Pose:
         inv_position = -inv_rotation @ self.position
         return Pose(position=inv_position, rotation=inv_rotation)
 
-    def to_pupil_labs_optitrack_format(self):
-        """Convert the pose to OptiTrack coordinate system."""
-        opti_position = np.array(
-            [-self.position[0], -self.position[1], -self.position[2]]
+    def to_pupil_labs_mocap_format(self, R_apriltag_to_mocap):
+        """Convert the pose to MoCap coordinate system."""
+        mocap_position = np.array(
+            [self.position[0], self.position[2], -self.position[1]]
         )
 
-        R_apriltag_to_optitrack = np.array(
-            [
-                [-1, 0, 0],  # X is reversed
-                [0, -1, 0],  # Y is reversed
-                [0, 0, -1],  # Z is reversed
-            ]
-        )
+        mocap_rotation = self.rotation.copy()
+        mocap_rotation = R_apriltag_to_mocap @ mocap_rotation
 
-        opti_rotation = self.rotation.copy()
-        opti_rotation = R_apriltag_to_optitrack @ opti_rotation
-
-        return Pose(position=opti_position, rotation=opti_rotation)
+        return Pose(position=mocap_position, rotation=mocap_rotation)
 
     def to_matrix(self):
         """Convert the pose to a transformation matrix."""

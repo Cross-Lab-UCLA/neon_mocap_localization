@@ -4,7 +4,7 @@ import numpy as np
 
 def plot_apriltag_and_surface_in_neon(
     apriltags,
-    display_surface,
+    neon_surface,
 ):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
@@ -57,11 +57,11 @@ def plot_apriltag_and_surface_in_neon(
         # Draw tag axes
         origin = tag_pose_neon.position
         axes = tag_pose_neon.rotation
-        ax.quiver(*origin, *axes[:, 0], color="r", length=0.05, normalize=True)
-        ax.quiver(*origin, *axes[:, 1], color="g", length=0.05, normalize=True)
-        ax.quiver(*origin, *axes[:, 2], color="b", length=0.05, normalize=True)
+        ax.quiver(*origin, *axes[:, 0], color="r", length=200.05, normalize=True)
+        ax.quiver(*origin, *axes[:, 1], color="g", length=200.05, normalize=True)
+        ax.quiver(*origin, *axes[:, 2], color="b", length=200.05, normalize=True)
 
-    surface_corners = display_surface.surface_corners.copy()
+    surface_corners = neon_surface.surface_corners.copy()
     surface_corners.append(surface_corners[0])  # Close the loop
     surface_corners_to_plot = np.array(surface_corners)
     ax.plot(
@@ -85,29 +85,29 @@ def plot_apriltag_and_surface_in_neon(
         0,
         0.2,
         color="r",
-        length=0.05,
+        length=200.05,
         normalize=True,
     )
 
     ax.quiver(
-        *(display_surface.pose_in_neon.position),
-        *(display_surface.x_axis),
+        *(neon_surface.pose_in_neon.position),
+        *(neon_surface.x_axis),
         color="r",
-        length=0.05,
+        length=300.05,
         normalize=True,
     )
     ax.quiver(
-        *(display_surface.pose_in_neon.position),
-        *(display_surface.y_axis),
+        *(neon_surface.pose_in_neon.position),
+        *(neon_surface.y_axis),
         color="g",
-        length=0.05,
+        length=300.05,
         normalize=True,
     )
     ax.quiver(
-        *(display_surface.pose_in_neon.position),
-        *(display_surface.normal),
+        *(neon_surface.pose_in_neon.position),
+        *(neon_surface.normal),
         color="b",
-        length=0.05,
+        length=300.05,
         normalize=True,
     )
 
@@ -124,13 +124,13 @@ def plot_apriltag_and_surface_in_neon(
 
 def plot_neon_in_surface(
     neon_pose_in_surface,
-    display_surface,
+    neon_surface,
 ):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
-    surface_plane = np.zeros((5, 3))
-    for i, s in enumerate(display_surface.surface_corners):
+    surface_plane = np.zeros((len(neon_surface.surface_corners), 3))
+    for i, s in enumerate(neon_surface.surface_corners):
         surface_plane[i] = (
             neon_pose_in_surface.rotation @ s + neon_pose_in_surface.position
         )
@@ -157,7 +157,7 @@ def plot_neon_in_surface(
     )
 
     cam_z_axis_in_surface = neon_pose_in_surface.rotation @ np.array(
-        [[0], [0], [0.5]]
+        [[0], [0], [10.5]]
     )  # 50cm forward
 
     # Plot camera Z axis (forward direction)
@@ -184,97 +184,55 @@ def plot_neon_in_surface(
     plt.show()
 
 
-def plot_neon_in_optitrack(
+def plot_neon_in_mocap(
     neon,
-    all_display_tag_markers_optitrack,
-    neon_marker_positions_in_optitrack,
-    cam_z_axis_in_optitrack,
+    mocap_surface,
+    mocap_head,
+    cam_z_axis_in_mocap,
 ):
-    tag_1_marker_positions_in_optitrack = all_display_tag_markers_optitrack[
-        (all_display_tag_markers_optitrack[:, 2] > 1.27)
-        & (all_display_tag_markers_optitrack[:, 0] < 0)
-    ]
-    tag_2_marker_positions_in_optitrack = all_display_tag_markers_optitrack[
-        (all_display_tag_markers_optitrack[:, 2] > 1.27)
-        & (all_display_tag_markers_optitrack[:, 0] > 0)
-    ]
-    tag_3_marker_positions_in_optitrack = all_display_tag_markers_optitrack[
-        (all_display_tag_markers_optitrack[:, 2] < 1.27)
-        & (all_display_tag_markers_optitrack[:, 0] > 0)
-    ]
-    tag_4_marker_positions_in_optitrack = all_display_tag_markers_optitrack[
-        (all_display_tag_markers_optitrack[:, 2] < 1.27)
-        & (all_display_tag_markers_optitrack[:, 0] < 0)
-    ]
-
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
-    ax.plot(
-        tag_1_marker_positions_in_optitrack[:, 0],
-        tag_1_marker_positions_in_optitrack[:, 1],
-        tag_1_marker_positions_in_optitrack[:, 2],
-        "ko",
-        label="Tag Markers",
-    )
-    ax.plot(
-        tag_1_marker_positions_in_optitrack[0, 0],
-        tag_1_marker_positions_in_optitrack[0, 1],
-        tag_1_marker_positions_in_optitrack[0, 2],
-        "go",
-    )
 
-    ax.plot(
-        tag_2_marker_positions_in_optitrack[:, 0],
-        tag_2_marker_positions_in_optitrack[:, 1],
-        tag_2_marker_positions_in_optitrack[:, 2],
-        "ko",
-    )
-    ax.plot(
-        tag_2_marker_positions_in_optitrack[1, 0],
-        tag_2_marker_positions_in_optitrack[1, 1],
-        tag_2_marker_positions_in_optitrack[1, 2],
-        "ro",
-    )
+    for ac, apriltag in enumerate(mocap_surface.apriltags):
+        for mc, marker in enumerate(apriltag.markers):
+            if ac == 0 and mc == 0:
+                ax.plot(
+                    marker.Xs,
+                    marker.Ys,
+                    marker.Zs,
+                    "ko",
+                    label="Tag Markers",
+                )
+            else:
+                ax.plot(
+                    marker.Xs,
+                    marker.Ys,
+                    marker.Zs,
+                    "ko",
+                )
 
-    ax.plot(
-        tag_3_marker_positions_in_optitrack[:, 0],
-        tag_3_marker_positions_in_optitrack[:, 1],
-        tag_3_marker_positions_in_optitrack[:, 2],
-        "ko",
-    )
-    ax.plot(
-        tag_3_marker_positions_in_optitrack[3, 0],
-        tag_3_marker_positions_in_optitrack[3, 1],
-        tag_3_marker_positions_in_optitrack[3, 2],
-        "bo",
-    )
-
-    ax.plot(
-        tag_4_marker_positions_in_optitrack[:, 0],
-        tag_4_marker_positions_in_optitrack[:, 1],
-        tag_4_marker_positions_in_optitrack[:, 2],
-        "ko",
-    )
-    ax.plot(
-        tag_4_marker_positions_in_optitrack[1, 0],
-        tag_4_marker_positions_in_optitrack[1, 1],
-        tag_4_marker_positions_in_optitrack[1, 2],
-        "mo",
-    )
-
-    ax.plot(
-        neon_marker_positions_in_optitrack[0, :],
-        neon_marker_positions_in_optitrack[1, :],
-        neon_marker_positions_in_optitrack[2, :],
-        "rs",
-        label="Neon Markers",
-    )
+    for c, marker in enumerate(mocap_head.markers):
+        if c == 0:
+            ax.plot(
+                marker.Xs,
+                marker.Ys,
+                marker.Zs,
+                "rs",
+                label="Neon Markers",
+            )
+        else:
+            ax.plot(
+                marker.Xs,
+                marker.Ys,
+                marker.Zs,
+                "rs",
+            )
 
     # Plot estimated scene camera position
     ax.scatter(
-        neon.pose_in_optitrack.position[0],
-        neon.pose_in_optitrack.position[1],
-        neon.pose_in_optitrack.position[2],
+        neon.pose_in_mocap.position[0],
+        neon.pose_in_mocap.position[1],
+        neon.pose_in_mocap.position[2],
         color="b",
         marker="s",
         s=50,
@@ -283,12 +241,12 @@ def plot_neon_in_optitrack(
 
     # Plot camera Z axis (forward direction)
     ax.quiver(
-        neon.pose_in_optitrack.position[0],
-        neon.pose_in_optitrack.position[1],
-        neon.pose_in_optitrack.position[2],
-        cam_z_axis_in_optitrack[0, 0],
-        cam_z_axis_in_optitrack[1, 0],
-        cam_z_axis_in_optitrack[2, 0],
+        neon.pose_in_mocap.position[0],
+        neon.pose_in_mocap.position[1],
+        neon.pose_in_mocap.position[2],
+        cam_z_axis_in_mocap[0, 0],
+        cam_z_axis_in_mocap[1, 0],
+        cam_z_axis_in_mocap[2, 0],
         color="r",
         length=0.1,
         normalize=True,
@@ -299,55 +257,53 @@ def plot_neon_in_optitrack(
     ax.set_zlabel("Z")
 
     ax.legend()
-    ax.set_title("Neon in OptiTrack Coordinate System")
+    ax.set_title("Neon in MoCap Coordinate System")
     ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
 
 
-def plot_surface_local_coordinate_system_in_optitrack(
-    all_display_tag_markers_optitrack,
-    display_pose_optitrack,
-):
+def plot_surface_local_coordinate_system_in_mocap(mocap_surface):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
-    for marker in all_display_tag_markers_optitrack:
-        ax.scatter(
-            marker[0],
-            marker[1],
-            marker[2],
-            color="k",
-            s=50,
-        )
+    for apriltag in mocap_surface.apriltags:
+        for marker in apriltag.markers:
+            ax.scatter(
+                marker.Xs,
+                marker.Ys,
+                marker.Zs,
+                color="k",
+                s=50,
+            )
 
     ax.plot(
-        display_pose_optitrack.position[0],
-        display_pose_optitrack.position[1],
-        display_pose_optitrack.position[2],
+        mocap_surface.pose.position[0],
+        mocap_surface.pose.position[1],
+        mocap_surface.pose.position[2],
         "ro",
-        label="Display Surface Origin",
+        label="MoCap Surface Origin",
     )
 
     ax.quiver(
-        *display_pose_optitrack.position,
-        *display_pose_optitrack.rotation[:, 0],
+        *mocap_surface.pose.position,
+        *mocap_surface.pose.rotation[:, 0],
         color="r",
-        length=0.05,
+        length=30.05,
         normalize=True,
     )
     ax.quiver(
-        *display_pose_optitrack.position,
-        *display_pose_optitrack.rotation[:, 1],
+        *mocap_surface.pose.position,
+        *mocap_surface.pose.rotation[:, 1],
         color="g",
-        length=0.05,
+        length=15.05,
         normalize=True,
     )
     ax.quiver(
-        *display_pose_optitrack.position,
-        *display_pose_optitrack.rotation[:, 2],
+        *mocap_surface.pose.position,
+        *mocap_surface.pose.rotation[:, 2],
         color="b",
-        length=0.05,
+        length=15.05,
         normalize=True,
     )
 
@@ -356,7 +312,7 @@ def plot_surface_local_coordinate_system_in_optitrack(
     ax.set_zlabel("Z")
 
     ax.legend()
-    ax.set_title("Local Display Surface Coordinate System")
+    ax.set_title("Local Surface Coordinate System")
     ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
