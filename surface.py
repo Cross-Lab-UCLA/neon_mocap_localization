@@ -9,15 +9,41 @@ class Surface:
         self.tag_size = tag_size
         self.tag_poses = []
         self.surface_corners = []
+        self.marker_local_coords = None
 
     def add_tag_pose(self, pose):
         self.tag_poses.append(pose)
         self.surface_corners.append(pose.position)
 
-    def build_surface(self, orient_towards):
+    def build_surface(self, orient_towards, from_poses=True):
         centers = np.stack([pose.position for pose in self.tag_poses], axis=1)
+        if not from_poses:
+            tag_half = self.tag_size / 2
+            tag_plane = np.array(
+                [
+                    [-tag_half, -tag_half, 0],
+                    [tag_half, -tag_half, 0],
+                    [tag_half, tag_half, 0],
+                    [-tag_half, tag_half, 0],
+                    [-tag_half, -tag_half, 0],
+                ]
+            )
 
-        centroid, R = fit_plane(centers, orient_towards)
+            centers = np.zeros((len(self.tag_poses), 5, 3))
+            for i, tag_pose in enumerate(self.tag_poses):
+                # Transform tag corners to camera frame using tag_pose
+                tag_corners_in_cam = (
+                    tag_pose.rotation @ tag_plane.T
+                ).T + tag_pose.position
+
+                for c in range(5):
+                    centers[i, c] = tag_corners_in_cam[c]
+
+            centers.shape = (-1, 3)
+
+        centroid, R = fit_plane(centers.T, orient_towards)
+
+        print(centroid)
 
         self.x_axis = R[:, 0]  # first column = x-axis of best-fit plane
         self.y_axis = R[:, 1]  # second column = y-axis of best-fit

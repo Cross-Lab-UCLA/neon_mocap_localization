@@ -5,7 +5,7 @@ from pose import Pose
 
 
 class AprilTags:
-    def __init__(self, camera_matrix, dist_coeffs, tag_size):
+    def __init__(self, neon, tag_size, img):
         self.at_detector = Detector(
             families="tag36h11",
             nthreads=4,
@@ -15,12 +15,15 @@ class AprilTags:
             decode_sharpening=0.25,
             debug=0,
         )
-        self.K = camera_matrix
-        self.D = dist_coeffs
+        self.K = neon.camera_matrix
+        self.D = neon.dist_coeffs
         self.tag_size = tag_size
 
         self.tag_poses = []
         self.tag_corners = []
+
+        self.detect_tags(img)
+        self.extract_tag_poses()
 
     def detect_tags(self, image):
         img_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
