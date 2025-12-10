@@ -2,6 +2,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def set_axes_equal(ax):
+    """Make axes of 3D plot have equal scale."""
+    limits = np.array(
+        [
+            ax.get_xlim3d(),
+            ax.get_ylim3d(),
+            ax.get_zlim3d(),
+        ]
+    )
+    origin = np.mean(limits, axis=1)
+    radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
+    ax.set_xlim3d([origin[0] - radius, origin[0] + radius])
+    ax.set_ylim3d([origin[1] - radius, origin[1] + radius])
+    ax.set_zlim3d([origin[2] - radius, origin[2] + radius])
+
+
 def plot_apriltag_and_surface_in_neon(
     apriltags,
     neon_surface,
@@ -117,7 +133,8 @@ def plot_apriltag_and_surface_in_neon(
     ax.set_title("AprilTag + Surface in Camera Coordinate System")
     ax.legend()
 
-    ax.set_box_aspect([1, 1, 0.5])
+    set_axes_equal(ax)
+    # ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
 
@@ -129,7 +146,7 @@ def plot_neon_in_surface(
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
-    surface_plane = np.zeros((len(neon_surface.surface_corners), 3))
+    surface_plane = np.zeros((len(neon_surface.surface_corners) + 1, 3))
     for i, s in enumerate(neon_surface.surface_corners):
         surface_plane[i] = (
             neon_pose_in_surface.rotation @ s + neon_pose_in_surface.position
@@ -179,7 +196,8 @@ def plot_neon_in_surface(
     ax.set_title("Neon in Surface Coordinate System")
 
     ax.legend()
-    ax.set_box_aspect([1, 1, 0.5])
+    set_axes_equal(ax)
+    # ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
 
@@ -258,7 +276,8 @@ def plot_neon_in_mocap(
 
     ax.legend()
     ax.set_title("Neon in MoCap Coordinate System")
-    ax.set_box_aspect([1, 1, 0.5])
+    set_axes_equal(ax)
+    # ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
 
@@ -313,6 +332,7 @@ def plot_surface_local_coordinate_system_in_mocap(mocap_surface):
 
     ax.legend()
     ax.set_title("Local Surface Coordinate System")
-    ax.set_box_aspect([1, 1, 0.5])
+    set_axes_equal(ax)
+    # ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
