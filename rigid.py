@@ -6,7 +6,12 @@ def fit_plane(centers, orient_towards=None):
     centered = centers - centroid
 
     # SVD on 3xN centered points
-    U, _, _ = np.linalg.svd(centered)
+    try:
+        U, _, _ = np.linalg.svd(centered)
+    except Exception:
+        # sometimes SVD does not converge on poor frames or frames
+        # without apriltags, so just skip those few instances
+        return None, None
 
     normal = U[:, 2]
     normal /= np.linalg.norm(normal)
@@ -14,46 +19,50 @@ def fit_plane(centers, orient_towards=None):
     if orient_towards is not None:
         orient_towards = np.asarray(orient_towards, dtype=float)
 
-        if orient_towards.ndim == 1:
-            orient_towards = orient_towards[:, np.newaxis]
+        # if orient_towards.ndim == 1:
+        # orient_towards = orient_towards[:, np.newaxis]
 
-        ref_vec = orient_towards.mean(axis=1) - centroid.squeeze()
+        ref_vec = orient_towards - centroid.squeeze()
+        print(ref_vec)
 
-        if np.dot(normal, ref_vec) < 0:
+        if np.dot(normal, ref_vec) > 0:
             normal = -normal
 
         U[:, 2] = normal
 
+    U[:, 0] /= np.linalg.norm(U[:, 0])
+    U[:, 1] /= np.linalg.norm(U[:, 1])
+    U[:, 2] /= np.linalg.norm(U[:, 2])
+
     return centroid, U
 
 
-def compute_rigid_transform(A, B):
-    """
-    Computes the rotation R and translation t such that:
-    B ≈ R @ A + t
-    where A and B are 3×N matrices (N=4 for 4 tag corners)
-    """
-    assert A.shape == B.shape
+def fit_plane_simple(centers, orient_towards=None, from_poses=False):
+    centroid = np.mean(centers, axis=1, keepdims=True)
+    centered = centers - centroid
 
-    # Subtract centroids
-    centroid_A = A.mean(axis=1, keepdims=True)
-    centroid_B = B.mean(axis=1, keepdims=True)
+    x_axis = centered[:, 1] - centered[:, 0]
+    y_axis = centered[:, 3] - centered[:, 0]
+    normal = np.cross(centered[:, 1] - centered[:, 0], centered[:, 3] - centered[:, 0])
 
-    AA = A - centroid_A
-    BB = B - centroid_B
+    if orient_towards is not None:
+        orient_towards = np.asarray(orient_towards, dtype=float)
 
-    # Compute covariance matrix
-    H = AA @ BB.T
+        # if orient_towards.ndim == 1:
+        # orient_towards = orient_towards[:, np.newaxis]
 
-    # SVD
-    U, S, Vt = np.linalg.svd(H)
-    R = Vt.T @ U.T
+        ref_vec = orient_towards - centroid.squeeze()
 
-    # Correct possible reflection
-    if np.linalg.det(R) < 0:
-        Vt[-1, :] *= -1
-        R = Vt.T @ U.T
+        if np.dot(normal, ref_vec) > 0:
+            normal = -normal
 
-    t = centroid_B - R @ centroid_A
+    R = np.zeros((3, 3))
+    R[:, 0] = x_axis
+    R[:, 1] = y_axis
+    R[:, 2] = normal
 
-    return R, t
+    R[:, 0] /= np.linalg.norm(R[:, 0])
+    R[:, 1] /= np.linalg.norm(R[:, 1])
+    R[:, 2] /= np.linalg.norm(R[:, 2])
+
+    return centroid, R

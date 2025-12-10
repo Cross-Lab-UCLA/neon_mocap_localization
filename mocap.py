@@ -70,7 +70,7 @@ class MocapSurface:
     def add_apriltag(self, apriltag):
         self.apriltags.append(apriltag)
 
-    def construct_pose(self):
+    def construct_pose(self, orient_towards=None):
         """
         Construct the estimated pose of the surface in mocap system.
         """
@@ -83,56 +83,73 @@ class MocapSurface:
                 ys.append(marker.Ys)
                 zs.append(marker.Zs)
 
-        poses = np.vstack([xs, ys, zs])
-        print(poses.shape)
+        centers = np.array(
+            [
+                [apriltag.center[0] for apriltag in self.apriltags],
+                [apriltag.center[1] for apriltag in self.apriltags],
+                [apriltag.center[2] for apriltag in self.apriltags],
+            ]
+        )
 
-        centroid, rotation = fit_plane(poses)
+        centroid = np.mean(centers, axis=1)
+
+        self.x_axis = self.apriltags[1].center - self.apriltags[0].center
+        self.x_axis /= np.linalg.norm(self.x_axis)
+
+        self.y_axis = self.apriltags[3].center - self.apriltags[0].center
+        self.y_axis /= np.linalg.norm(self.y_axis)
+
+        self.normal = np.cross(self.x_axis, self.y_axis)
+        self.normal /= np.linalg.norm(self.normal)
+
+        if orient_towards is not None:
+            orient_towards = np.asarray(orient_towards, dtype=float)
+
+            ref_vec = orient_towards - centroid.squeeze()
+
+            if np.dot(self.normal, ref_vec) < 0:
+                self.normal = -self.normal
+
+        rotation = np.zeros((3, 3))
+        rotation[:, 0] = self.x_axis
+        rotation[:, 1] = self.y_axis
+        rotation[:, 2] = self.normal
+
         self.pose = Pose(
             position=centroid.flatten(),
             rotation=rotation,
         )
 
-        apriltag.estimate_size_mm()
-        self.tag_size = apriltag.tag_size
+        self.apriltags[0].estimate_size_mm()
+        self.tag_size = self.apriltags[0].tag_size
+
+        return True
 
 
-class MocapCalibData(object):
-    """
-    Holds the IR Maker Mocap calibration data.
-    """
-
-    def __init__(self, surface, head):
-        self.surface = surface
-        self.head = head
-
-
-def unify_calib_data(neon, mocap_surface, img, R_apriltag_to_mocap):
+def extract_apriltag_surface(neon, mocap_surface, img):
     # detect apriltags in neon image
-    neon_apriltags = AprilTags(neon, mocap_surface.tag_size, img)
+
+    neon_apriltags = AprilTags(neon, 130, img)
+    # neon_apriltags = AprilTags(neon, mocap_surface.tag_size, img)
+
+    if not neon_apriltags.good_detection:
+        return None, None
 
     # find neon's pose in each apriltag coordinate system
     for pose in neon_apriltags.tag_poses:
         neon.add_pose_in_tag(pose.inverse())
 
     # take detected tag poses and combine them into a surface
-    neon_surface = Surface(mocap_surface.tag_size)
+    # neon_surface = Surface(mocap_surface.tag_size)
+    neon_surface = Surface(130)
     for pose in neon_apriltags.tag_poses:
         neon_surface.add_tag_pose(pose)
 
     # build the surface from the tags
-    neon_surface.build_surface(
-        orient_towards=neon.pose_in_tags[0].position, from_poses=False
+    ok = neon_surface.build_surface(
+        orient_towards=neon.pose_in_tags[0].position, from_poses=True
     )
-
-    # find neon's pose in local surface coordinate system
-    # NOTE: the local surface coordinate system follows the conventions of
-    # our SVD method in `fit_plane`.
-    # It does not follow the MoCap coordinate system conventions, but that is okay,
-    # as the end result is in the MoCap coordinate system.
-    neon.set_pose_in_surface(neon_surface.pose_in_neon.inverse())
-
-    # apply surface pose in mocap sys to neon pose in surface coordinates
-    # to get neon camera pose in mocap coordinates
-    neon.calculate_pose_in_mocap(mocap_surface.pose, R_apriltag_to_mocap)
+    if not ok:
+        return None, None
 
     return neon_surface, neon_apriltags

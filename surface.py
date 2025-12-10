@@ -1,7 +1,7 @@
 import numpy as np
 
 from pose import Pose
-from rigid import compute_rigid_transform, fit_plane
+from rigid import fit_plane_simple
 
 
 class Surface:
@@ -16,7 +16,7 @@ class Surface:
         self.surface_corners.append(pose.position)
 
     def build_surface(self, orient_towards, from_poses=True):
-        centers = np.stack([pose.position for pose in self.tag_poses], axis=1)
+        # centers = np.stack([pose.position for pose in self.tag_poses], axis=1)
         if not from_poses:
             tag_half = self.tag_size / 2
             tag_plane = np.array(
@@ -41,9 +41,52 @@ class Surface:
 
             centers.shape = (-1, 3)
 
-        centroid, R = fit_plane(centers.T, orient_towards)
+        try:
+            centroid = np.mean(np.array(self.surface_corners), axis=0)
 
-        print(centroid)
+            # top right - top left
+            self.x_axis = self.surface_corners[1] - self.surface_corners[0]
+            self.x_axis /= np.linalg.norm(self.x_axis)
+
+            # top left - bottom left
+            self.y_axis = -(self.surface_corners[3] - self.surface_corners[0])
+            self.y_axis /= np.linalg.norm(self.y_axis)
+
+            # cross-product of x & y
+            self.normal = np.cross(self.x_axis, self.y_axis)
+            self.normal /= np.linalg.norm(self.normal)
+
+            if orient_towards is not None:
+                orient_towards = np.asarray(orient_towards, dtype=float)
+
+                ref_vec = orient_towards - centroid.squeeze()
+
+                if np.dot(self.normal, ref_vec) < 0:
+                    self.normal = -self.normal
+
+            R = np.zeros((3, 3))
+            R[:, 0] = self.x_axis
+            R[:, 1] = self.y_axis
+            R[:, 2] = self.normal
+        except Exception:
+            return False
+
+        print("huh")
+
+        self.pose_in_neon = Pose(
+            position=centroid.flatten(),
+            rotation=R,
+        )
+
+        return True
+
+    def build_surface_simple(self, orient_towards):
+        centers = np.stack([pose.position for pose in self.tag_poses], axis=1)
+
+        try:
+            centroid, R = fit_plane_simple(centers, orient_towards)
+        except Exception:
+            return False
 
         self.x_axis = R[:, 0]  # first column = x-axis of best-fit plane
         self.y_axis = R[:, 1]  # second column = y-axis of best-fit
@@ -54,30 +97,4 @@ class Surface:
             rotation=R,
         )
 
-    def estimate_pose_from_corners(self):
-        # Example: local and global corner arrays, shape (3, 4)
-        # Replace with your real data
-        s = self.tag_size  # Tag size in meters
-        local_corners = np.array(
-            [
-                [-s / 2, s / 2, s / 2, -s / 2],
-                [s / 2, s / 2, -s / 2, -s / 2],
-                [0, 0, 0, 0],
-            ]
-        )
-
-        x0, y0, z0 = self.tag_poses[2].position  # top left
-        x1, y1, z1 = self.tag_poses[1].position  # top right
-        x2, y2, z2 = self.tag_poses[0].position  # bottom right
-        x3, y3, z3 = self.tag_poses[3].position  # bottom left
-
-        global_corners = np.array(
-            [[x0, x1, x2, x3], [y0, y1, y2, y3], [z0, z1, z2, z3]]
-        )
-
-        R, t = compute_rigid_transform(local_corners, global_corners)
-
-        return Pose(
-            position=t.flatten(),
-            rotation=R,
-        )
+        return True
