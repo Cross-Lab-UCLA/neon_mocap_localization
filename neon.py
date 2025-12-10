@@ -1,28 +1,15 @@
+import cv2
 import numpy as np
-import json
 
 
 class Neon:
-    def __init__(self, calib_path=None, recording=None):
-        if recording is not None:
-            camera_matrix = recording.calibration.scene_camera_matrix
-            distortion_coefficients = (
-                recording.calibration.scene_distortion_coefficients
-            )
+    def __init__(self, recording):
+        # if recording is not None:
+        camera_matrix = recording.calibration.scene_camera_matrix
+        distortion_coefficients = recording.calibration.scene_distortion_coefficients
 
-            self.camera_matrix = camera_matrix
-            self.dist_coeffs = distortion_coefficients.flatten()
-        elif calib_path is not None:
-            scene_calib = []
-            with open(calib_path, "r") as f:
-                scene_calib = json.load(f)
-
-            self.camera_matrix = np.array(scene_calib["camera_matrix"])
-            self.dist_coeffs = np.array(
-                scene_calib["distortion_coefficients"]
-            ).flatten()
-        else:
-            raise Exception("Need a native recording path or calibratioon file path")
+        self.camera_matrix = camera_matrix
+        self.dist_coeffs = distortion_coefficients.flatten()
 
         self.pose_in_tags = []
         self.pose_in_surface = None
