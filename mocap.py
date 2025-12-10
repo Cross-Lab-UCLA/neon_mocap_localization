@@ -16,6 +16,8 @@ class MocapIRMarker:
         self.Ys = Ys
         self.Zs = Zs
 
+        self.position = np.array([Xs, Ys, Zs])
+
 
 class MocapHead:
     def __init__(self):
@@ -26,18 +28,29 @@ class MocapHead:
 
 
 class MocapAprilTag:
-    def __init__(self):
+    def __init__(self, tag_id):
         self.markers = []
+        self.center = np.array([0, 0, 0])
+        self.tag_id = tag_id
 
     def add_marker(self, marker):
         self.markers.append(marker)
+
+    def estimate_tag_center(self):
+        pos = np.array(
+            [
+                [marker.Xs for marker in self.markers],
+                [marker.Ys for marker in self.markers],
+                [marker.Zs for marker in self.markers],
+            ]
+        )
+        self.center = np.mean(pos, axis=1)
 
     def estimate_size_mm(self):
         """
         Estimate tag size [m] from mocap data.
         """
 
-        # nsamples = len(self.markers[0].Xs)
         tag_marker1_pos = np.array(
             [
                 self.markers[0].Xs,
