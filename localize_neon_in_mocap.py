@@ -66,10 +66,6 @@ marker_positions = pd.read_csv(args["mocap_path"])
 print("Searching for most accurate localization...")
 smallest_error = float("inf")
 
-cv2.namedWindow("AprilTag Tracking", cv2.WINDOW_NORMAL)
-
-last_ts = neon_rec.scene.time[-1]
-
 rmses = []
 for frame in tqdm(range(int(nframes))):
     neon_timestamp = neon_rec.scene.time[frame]
@@ -81,11 +77,6 @@ for frame in tqdm(range(int(nframes))):
 
     if apriltag_img is None:
         continue
-
-    # 2. Display the resulting frame
-    cv2.imshow("AprilTag Tracking", apriltag_img)
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
 
     # find the equivalent marker positions based on neon timestamp
     if "timestamp [ns]" in marker_positions:
@@ -184,8 +175,7 @@ for frame in tqdm(range(int(nframes))):
         neon_camera_position_relative_to_markers = (
             neon.pose_in_mocap.position - avg_neon_marker_positions
         )
-    except Exception as e:
-        print(e)
+    except Exception:
         continue
 
     neon_camera_pose_relative_to_markers = Pose(
@@ -196,7 +186,6 @@ for frame in tqdm(range(int(nframes))):
     best_calib_data = {
         "best_frame": frame,
         "timestamp": neon_timestamp,
-        "neon_surface": neon_surface,
         "neon_apriltags": neon_apriltags,
         "neon_camera_pose_relative_to_markers": neon_camera_pose_relative_to_markers,
         "mocap_surface": mocap_surface,
