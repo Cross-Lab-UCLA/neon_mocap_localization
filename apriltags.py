@@ -87,8 +87,17 @@ class AprilTags:
                 self.good_detection = False
                 return
 
+            # if detection.tag_id == 0:
             self.reprojection_errors.append(error)
 
+            # corners = detection.corners
+            # corners = [np.roll(corner_array, 2, axis=1) for corner_array in corners]
+            # self.tag_corners.append(corners)
+
+            # 1 is BL
+            # 2 is BR
+            # 3 is TR
+            # 4 is TL
             self.tag_corners.append(detection.corners)
             self.tag_ids.append(detection.tag_id)
 

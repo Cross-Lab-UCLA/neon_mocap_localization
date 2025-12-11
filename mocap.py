@@ -1,22 +1,19 @@
 import numpy as np
 
-from apriltags import AprilTags
-from pose import Pose
-from rigid import fit_plane
-from surface import Surface
-
 
 class MocapIRMarker:
     """
     Holds the timeseries of positions of an IR Marker
     """
 
-    def __init__(self, Xs, Ys, Zs):
+    def __init__(self, Xs, Ys, Zs, id):
         self.Xs = Xs
         self.Ys = Ys
         self.Zs = Zs
 
         self.position = np.array([Xs, Ys, Zs])
+
+        self.id = id
 
 
 class MocapHead:
