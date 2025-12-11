@@ -211,6 +211,7 @@ def plot_neon_in_mocap(
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
+    cols = ["r", "g", "b", "k"]
     for ac, apriltag in enumerate(mocap_surface.apriltags):
         for mc, marker in enumerate(apriltag.markers):
             if ac == 0 and mc == 0:
@@ -218,7 +219,7 @@ def plot_neon_in_mocap(
                     marker.Xs,
                     marker.Ys,
                     marker.Zs,
-                    "ko",
+                    cols[marker.id] + "o",
                     label="Tag Markers",
                 )
             else:
@@ -226,7 +227,7 @@ def plot_neon_in_mocap(
                     marker.Xs,
                     marker.Ys,
                     marker.Zs,
-                    "ko",
+                    cols[marker.id] + "o",
                 )
 
     for c, marker in enumerate(mocap_head.markers):
