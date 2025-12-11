@@ -125,7 +125,7 @@ class AprilTags:
             ok, (tag_rotation, _), (tag_position, _), (error, _) = cv2.solvePnPGeneric(
                 tag_points_3d,
                 detection.corners,
-                self.K,
+                self.new_K,
                 self.D,
                 flags=cv2.SOLVEPNP_IPPE_SQUARE,
             )
