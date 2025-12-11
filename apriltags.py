@@ -63,12 +63,59 @@ class AprilTags:
             self.good_detection = False
             return
 
+        # colors = [(0, 0, 255), (0, 255, 0), (255, 0, 0), (0, 255, 255)]
+
+        # image = self.undist_frame
+        # for detection in self.at_detection:
+        #     tag_id = detection.tag_id
+        #     corners = detection.corners
+        #     center = detection.center
+
+        #     pts = corners.astype(np.int32).reshape((-1, 1, 2))
+        #     cv2.polylines(image, [pts], True, (0, 255, 0), 2)
+
+        #     for i in range(4):
+        #         pt = tuple(corners[i].astype(int))
+
+        #         cv2.circle(image, pt, 8, colors[i], -1)
+
+        #         cv2.putText(
+        #             image,
+        #             str(i),
+        #             (pt[0] + 10, pt[1] + 10),
+        #             cv2.FONT_HERSHEY_SIMPLEX,
+        #             0.8,
+        #             colors[i],
+        #             2,
+        #         )
+
+        #         cv2.putText(
+        #             image,
+        #             f"ID: {tag_id}",
+        #             (int(center[0]), int(center[1])),
+        #             cv2.FONT_HERSHEY_SIMPLEX,
+        #             0.8,
+        #             (0, 0, 255),
+        #             2,
+        #         )
+
+        # cv2.imshow("Pupil Apriltags Visualization", image)
+        # cv2.destroyAllWindows()
+
+        # tag_points_3d = np.array(
+        #     [
+        #         [-self.tag_size / 2, self.tag_size / 2, 0],  # BL
+        #         [self.tag_size / 2, self.tag_size / 2, 0],  # BR
+        #         [self.tag_size / 2, -self.tag_size / 2, 0],  # TR
+        #         [-self.tag_size / 2, -self.tag_size / 2, 0],  # TL
+        #     ]
+        # )
         tag_points_3d = np.array(
             [
+                [self.tag_size / 2, -self.tag_size / 2, 0],  # TR
+                [-self.tag_size / 2, -self.tag_size / 2, 0],  # TL
                 [-self.tag_size / 2, self.tag_size / 2, 0],  # BL
                 [self.tag_size / 2, self.tag_size / 2, 0],  # BR
-                [self.tag_size / 2, -self.tag_size / 2, 0],  # TL
-                [-self.tag_size / 2, -self.tag_size / 2, 0],  # TR
             ]
         )
 
