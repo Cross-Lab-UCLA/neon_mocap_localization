@@ -1,4 +1,8 @@
 import numpy as np
+import open3d as o3d
+
+from pose import Pose
+from rigid import get_plane_coordinate_system
 
 
 class MocapIRMarker:
@@ -19,9 +23,16 @@ class MocapIRMarker:
 class MocapHead:
     def __init__(self):
         self.markers = []
+        self.poses = []
 
     def add_marker(self, marker):
         self.markers.append(marker)
+        self.poses.append(
+            Pose(
+                position=np.array([marker.Xs, marker.Ys, marker.Zs]),
+                rotation=np.eye(3),
+            )
+        )
 
 
 class MocapAprilTag:
@@ -43,7 +54,7 @@ class MocapAprilTag:
         )
         self.center = np.mean(pos, axis=1)
 
-    def estimate_size_mm(self):
+    def estimate_size(self):
         """
         Estimate tag size [m] from mocap data.
         """
@@ -79,3 +90,55 @@ class MocapSurface:
 
     def add_apriltag(self, apriltag):
         self.apriltags.append(apriltag)
+
+    def construct_pose(self, orient_towards=None):
+        """
+        Construct the estimated pose of the surface in mocap system.
+        """
+
+        apriltag = []
+        xs, ys, zs = [], [], []
+        for apriltag in self.apriltags:
+            for marker in apriltag.markers:
+                xs.append(marker.Xs)
+                ys.append(marker.Ys)
+                zs.append(marker.Zs)
+
+        poses = np.vstack([xs, ys, zs]).T
+
+        self.centroid = np.mean(poses, axis=0)
+
+        try:
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(poses)
+
+            plane_model, inliers = pcd.segment_plane(
+                distance_threshold=0.1, ransac_n=3, num_iterations=1000
+            )
+            [a, b, c, d] = plane_model
+
+            inlier_cloud = np.asarray(pcd.select_by_index(inliers).points)
+
+            (self.x_axis, self.y_axis, self.normal) = get_plane_coordinate_system(
+                inlier_cloud
+            )
+
+            if orient_towards is not None:
+                orient_towards = np.asarray(orient_towards, dtype=float)
+
+                ref_vec = orient_towards - self.centroid.squeeze()
+
+                if np.dot(self.normal, ref_vec) < 0:
+                    self.normal = -self.normal
+
+            R = np.zeros((3, 3))
+            R[:, 0] = self.x_axis
+            R[:, 1] = self.y_axis
+            R[:, 2] = self.normal
+        except Exception:
+            return False
+
+        self.pose = Pose(
+            position=self.centroid.flatten(),
+            rotation=R,
+        )
