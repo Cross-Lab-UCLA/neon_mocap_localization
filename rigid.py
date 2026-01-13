@@ -66,3 +66,20 @@ def fit_plane_simple(centers, orient_towards=None, from_poses=False):
     R[:, 2] /= np.linalg.norm(R[:, 2])
 
     return centroid, R
+
+
+def get_plane_coordinate_system(inlier_points):
+    centroid = np.mean(inlier_points, axis=0)
+    centered_points = inlier_points - centroid
+
+    # 3. Compute SVD
+    # u: Unitary arrays
+    # s: Singular values (variance magnitude)
+    # vh: Unitary arrays (The rows of vh are the eigenvectors/principal axes)
+    u, s, vh = np.linalg.svd(centered_points)
+
+    local_x = vh[0]
+    local_y = vh[1]
+    local_z = vh[2]
+
+    return local_x, local_y, local_z
