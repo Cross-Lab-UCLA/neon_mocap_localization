@@ -18,75 +18,24 @@ def set_axes_equal(ax):
     ax.set_zlim3d([origin[2] - radius, origin[2] + radius])
 
 
-def plot_apriltag_and_surface_in_neon(
+def plot_apriltags_in_neon(
     apriltags,
-    neon_surface,
+    tag_plane,
 ):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
-    # AprilTag corners in local tag frame (XY plane, Z=0)
-    tag_half = apriltags.tag_size / 2
-    tag_plane = np.array(
-        [
-            [-tag_half, -tag_half, 0],
-            [tag_half, -tag_half, 0],
-            [tag_half, tag_half, 0],
-            [-tag_half, tag_half, 0],
-            [-tag_half, -tag_half, 0],
-        ]
-    )
+    # Transform tag corners to camera frame using tag_pose_neon
+    tag_corners_in_cam = (
+        apriltags.pose.rotation @ tag_plane.T
+    ).T + apriltags.pose.position.T
 
-    for i, tag_pose_neon in enumerate(apriltags.tag_poses):
-        # Transform tag corners to camera frame using tag_pose_neon
-        tag_corners_in_cam = (
-            tag_pose_neon.rotation @ tag_plane.T
-        ).T + tag_pose_neon.position
-
-        if i == 0:
-            ax.plot(
-                tag_corners_in_cam[:, 0],
-                tag_corners_in_cam[:, 1],
-                tag_corners_in_cam[:, 2],
-                "g-",
-                linewidth=2,
-                label="AprilTag",
-            )
-        else:
-            ax.plot(
-                tag_corners_in_cam[:, 0],
-                tag_corners_in_cam[:, 1],
-                tag_corners_in_cam[:, 2],
-                "g-",
-                linewidth=2,
-            )
-
-        # Plot tag center
-        ax.scatter(
-            tag_pose_neon.position[0],
-            tag_pose_neon.position[1],
-            tag_pose_neon.position[2],
-            color="g",
-            s=50,
-        )
-
-        # Draw tag axes
-        origin = tag_pose_neon.position
-        axes = tag_pose_neon.rotation
-        ax.quiver(*origin, *axes[:, 0], color="r", length=200.05, normalize=True)
-        ax.quiver(*origin, *axes[:, 1], color="g", length=200.05, normalize=True)
-        ax.quiver(*origin, *axes[:, 2], color="b", length=200.05, normalize=True)
-
-    surface_corners = neon_surface.surface_corners.copy()
-    surface_corners.append(surface_corners[0])  # Close the loop
-    surface_corners_to_plot = np.array(surface_corners)
     ax.plot(
-        surface_corners_to_plot[:, 0],
-        surface_corners_to_plot[:, 1],
-        surface_corners_to_plot[:, 2],
-        color="m",
+        tag_corners_in_cam[:, 0],
+        tag_corners_in_cam[:, 1],
+        tag_corners_in_cam[:, 2],
+        "g-",
         linewidth=2,
-        label="Surface",
     )
 
     # Plot camera origin
@@ -101,31 +50,31 @@ def plot_apriltag_and_surface_in_neon(
         0,
         0.2,
         color="r",
-        length=200.05,
+        length=0.205,
         normalize=True,
     )
 
-    ax.quiver(
-        *(neon_surface.pose_in_neon.position),
-        *(neon_surface.x_axis),
-        color="r",
-        length=300.05,
-        normalize=True,
-    )
-    ax.quiver(
-        *(neon_surface.pose_in_neon.position),
-        *(neon_surface.y_axis),
-        color="g",
-        length=300.05,
-        normalize=True,
-    )
-    ax.quiver(
-        *(neon_surface.pose_in_neon.position),
-        *(neon_surface.normal),
-        color="b",
-        length=300.05,
-        normalize=True,
-    )
+    # ax.quiver(
+    #     *(neon_surface.pose_in_neon.position),
+    #     *(neon_surface.x_axis),
+    #     color="r",
+    #     length=0.305,
+    #     normalize=True,
+    # )
+    # ax.quiver(
+    #     *(neon_surface.pose_in_neon.position),
+    #     *(neon_surface.y_axis),
+    #     color="g",
+    #     length=0.305,
+    #     normalize=True,
+    # )
+    # ax.quiver(
+    #     *(neon_surface.pose_in_neon.position),
+    #     *(neon_surface.normal),
+    #     color="b",
+    #     length=0.305,
+    #     normalize=True,
+    # )
 
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
@@ -134,30 +83,30 @@ def plot_apriltag_and_surface_in_neon(
     ax.legend()
 
     set_axes_equal(ax)
-    # ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
 
 
 def plot_neon_in_surface(
     neon_pose_in_surface,
-    neon_surface,
+    best_plane,
+    surface_points_3d,
 ):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
-    surface_plane = np.zeros((len(neon_surface.surface_corners) + 1, 3))
-    for i, s in enumerate(neon_surface.surface_corners):
-        surface_plane[i] = (
-            neon_pose_in_surface.rotation @ s + neon_pose_in_surface.position
-        )
+    # surface_plane = np.zeros((len(neon_surface.surface_corners) + 1, 3))
+    # for i, s in enumerate(neon_surface.surface_corners):
+    #     surface_plane[i] = (
+    #         neon_pose_in_surface.rotation @ s + neon_pose_in_surface.position
+    #     )
 
-    surface_plane[-1] = surface_plane[0]  # Close the loop
+    # surface_plane[-1] = surface_plane[0]  # Close the loop
 
     ax.plot(
-        surface_plane[:, 0],
-        surface_plane[:, 1],
-        surface_plane[:, 2],
+        surface_points_3d[:, 0],
+        surface_points_3d[:, 1],
+        surface_points_3d[:, 2],
         "m-",
         linewidth=2,
         label="Virtual Surface",
@@ -309,21 +258,21 @@ def plot_surface_local_coordinate_system_in_mocap(mocap_surface):
         *mocap_surface.pose.position,
         *mocap_surface.pose.rotation[:, 0],
         color="r",
-        length=30.05,
+        length=0.105,
         normalize=True,
     )
     ax.quiver(
         *mocap_surface.pose.position,
         *mocap_surface.pose.rotation[:, 1],
         color="g",
-        length=15.05,
+        length=0.105,
         normalize=True,
     )
     ax.quiver(
         *mocap_surface.pose.position,
         *mocap_surface.pose.rotation[:, 2],
         color="b",
-        length=15.05,
+        length=0.105,
         normalize=True,
     )
 
