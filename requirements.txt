@@ -6,3 +6,6 @@ scipy
 opencv-python
 pupil-apriltags
 pupil-labs-neon-recording
+ezc3d
+open3d
+tqdm
