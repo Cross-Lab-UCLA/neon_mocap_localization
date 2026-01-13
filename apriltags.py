@@ -1,39 +1,27 @@
-import numpy as np
-
 import cv2
-from pupil_apriltags import Detector
+import numpy as np
 
 from pose import Pose
 
 
 class AprilTags:
-    def __init__(self, neon, tag_size, img):
-        self.at_detector = Detector(
-            families="tag36h11",
-            nthreads=4,
-            quad_decimate=1.0,
-            quad_sigma=0.0,
-            refine_edges=1,
-            decode_sharpening=0.25,
-            debug=0,
-        )
+    def __init__(self, detector, neon, tag_size, img, tag_corner_coordinates):
+        self.detector = detector
         self.K = neon.camera_matrix
         self.D = neon.dist_coeffs
         self.tag_size = tag_size
+        self.tag_corner_coordinates = tag_corner_coordinates
 
         self.good_detection = True
-        self.reprojection_errors = []
+        self.error = np.inf
+
+        self.pose = None
 
         self.undist_frame = None
-        self.tag_poses = []
-        self.tag_corners = []
-        self.tag_ids = []
 
-        self.detect_tags(img)
-        if self.good_detection:
-            self.extract_tag_poses()
+        self.detect_tags_and_extract_pose(img)
 
-    def detect_tags(self, image):
+    def detect_tags_and_extract_pose(self, image):
         img_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
         self.new_K, _ = cv2.getOptimalNewCameraMatrix(
@@ -49,7 +37,7 @@ class AprilTags:
         cy = self.new_K[1, 2]
 
         try:
-            self.at_detection = self.at_detector.detect(
+            self.at_detection = self.detector.detect(
                 self.undist_frame,
                 estimate_tag_pose=True,
                 tag_size=self.tag_size,

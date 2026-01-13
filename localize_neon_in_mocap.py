@@ -67,6 +67,16 @@ print("Searching for most accurate localization...")
 smallest_error = float("inf")
 
 rmses = []
+apriltag_detector = Detector(
+    families="tag36h11",
+    nthreads=4,
+    quad_decimate=1.0,
+    quad_sigma=0.0,
+    refine_edges=1,
+    decode_sharpening=0.25,
+    debug=0,
+)
+
 for frame in tqdm(range(int(nframes))):
     neon_timestamp = neon_rec.scene.time[frame]
 
@@ -82,6 +92,9 @@ for frame in tqdm(range(int(nframes))):
     if "timestamp [ns]" in marker_positions:
         diffs = (marker_positions["timestamp [ns]"] - neon_timestamp).abs()
         markers_for_calib = marker_positions.iloc[diffs.idxmin()]
+    neon_apriltags = AprilTags(
+        apriltag_detector, neon, 0.132, apriltag_img, tag_corner_coordinates
+    )
     else:
         markers_for_calib = marker_positions.iloc[len(marker_positions) // 2]
 
