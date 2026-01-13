@@ -56,17 +56,38 @@ except Exception:
     except Exception:
         raise ValueError("Not a valid Neon data directory")
 
-
-neon = Neon(recording=neon_rec)
-
 # load mocap data
 
 marker_positions = pd.read_csv(args["mocap_path"])
 
-print("Searching for most accurate localization...")
-smallest_error = float("inf")
+# load apriltag corner data (in a user-specified local coordinate system)
 
-rmses = []
+# tags should be listed in order of increasing ID
+# should be tag 0, tag 1, tag 2, tag 3
+# order for corners of each tag should be -> BL BR TR TL
+# x, y, z
+# units should be meters
+tag_corner_coordinates = pd.read_csv(args["coordinates_path"], header=None).to_numpy()
+tag_corner_coordinates *= 2.54
+tag_corner_coordinates *= 0.01
+
+plane_width = np.max(tag_corner_coordinates[:, 0])
+plane_height = np.max(tag_corner_coordinates[:, 1])
+
+tag_corner_coordinates[:, 0] -= plane_width / 2
+tag_corner_coordinates[:, 1] -= plane_height / 2
+
+plane_points_3d = np.array(
+    [
+        [-plane_width / 2, plane_height / 2, 0],  # BL
+        [plane_width / 2, plane_height / 2, 0],  # BR
+        [plane_width / 2, -plane_height / 2, 0],  # TR
+        [-plane_width / 2, -plane_height / 2, 0],  # TL
+        [-plane_width / 2, plane_height / 2, 0],  # BL
+    ]
+)
+
+neon = Neon(recording=neon_rec)
 apriltag_detector = Detector(
     families="tag36h11",
     nthreads=4,
@@ -77,6 +98,13 @@ apriltag_detector = Detector(
     debug=0,
 )
 
+# first find best apriltag detection
+print("Searching for most accurate localization...")
+best_calib_data = {}
+smallest_error = np.inf
+best_timestamp = 0
+best_frame = 0
+best_plane = None
 for frame in tqdm(range(int(nframes))):
     neon_timestamp = neon_rec.scene.time[frame]
 
@@ -95,6 +123,14 @@ for frame in tqdm(range(int(nframes))):
     neon_apriltags = AprilTags(
         apriltag_detector, neon, 0.132, apriltag_img, tag_corner_coordinates
     )
+    if neon_apriltags.good_detection:
+        if neon_apriltags.error < smallest_error:
+            smallest_error = neon_apriltags.error
+            best_timestamp = neon_timestamp
+            best_frame = frame
+            best_plane = neon_apriltags
+        else:
+            continue
     else:
         markers_for_calib = marker_positions.iloc[len(marker_positions) // 2]
 

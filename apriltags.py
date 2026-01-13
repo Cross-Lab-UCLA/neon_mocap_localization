@@ -51,96 +51,57 @@ class AprilTags:
             self.good_detection = False
             return
 
-        # colors = [(0, 0, 255), (0, 255, 0), (255, 0, 0), (0, 255, 255)]
+        zeroed_D = np.zeros((5, 1), dtype=np.float32)
 
-        # image = self.undist_frame
-        # for detection in self.at_detection:
-        #     tag_id = detection.tag_id
-        #     corners = detection.corners
-        #     center = detection.center
+        at_tag_pts = np.zeros((4, 4, 2), dtype=np.float32)
+        for detection in self.at_detection:
+            at_tag_pts[detection.tag_id] = detection.corners
 
-        #     pts = corners.astype(np.int32).reshape((-1, 1, 2))
-        #     cv2.polylines(image, [pts], True, (0, 255, 0), 2)
+        image_pts = at_tag_pts.reshape(-1, 2)
+        object_pts = self.tag_corner_coordinates.reshape(-1, 3)
 
-        #     for i in range(4):
-        #         pt = tuple(corners[i].astype(int))
-
-        #         cv2.circle(image, pt, 8, colors[i], -1)
-
-        #         cv2.putText(
-        #             image,
-        #             str(i),
-        #             (pt[0] + 10, pt[1] + 10),
-        #             cv2.FONT_HERSHEY_SIMPLEX,
-        #             0.8,
-        #             colors[i],
-        #             2,
-        #         )
-
-        #         cv2.putText(
-        #             image,
-        #             f"ID: {tag_id}",
-        #             (int(center[0]), int(center[1])),
-        #             cv2.FONT_HERSHEY_SIMPLEX,
-        #             0.8,
-        #             (0, 0, 255),
-        #             2,
-        #         )
-
-        # cv2.imshow("Pupil Apriltags Visualization", image)
-        # cv2.destroyAllWindows()
-
-        # tag_points_3d = np.array(
-        #     [
-        #         [-self.tag_size / 2, self.tag_size / 2, 0],  # BL
-        #         [self.tag_size / 2, self.tag_size / 2, 0],  # BR
-        #         [self.tag_size / 2, -self.tag_size / 2, 0],  # TR
-        #         [-self.tag_size / 2, -self.tag_size / 2, 0],  # TL
-        #     ]
-        # )
-        tag_points_3d = np.array(
-            [
-                [self.tag_size / 2, -self.tag_size / 2, 0],  # TR
-                [-self.tag_size / 2, -self.tag_size / 2, 0],  # TL
-                [-self.tag_size / 2, self.tag_size / 2, 0],  # BL
-                [self.tag_size / 2, self.tag_size / 2, 0],  # BR
-            ]
+        ok, (tag_rotation,), (tag_position,), (error,) = cv2.solvePnPGeneric(
+            objectPoints=object_pts,
+            imagePoints=image_pts,
+            cameraMatrix=self.new_K,
+            distCoeffs=zeroed_D,
+            flags=cv2.SOLVEPNP_ITERATIVE,
         )
 
-        for detection in self.at_detection:
-            # SOLVEPNP_IPPE_SQUARE returns 2 solutions for rotation/position/error.
-            # First one always has smallest error
-            ok, (tag_rotation, _), (tag_position, _), (error, _) = cv2.solvePnPGeneric(
-                tag_points_3d,
-                detection.corners,
-                self.new_K,
-                self.D,
-                flags=cv2.SOLVEPNP_IPPE_SQUARE,
-            )
+        if not ok:
+            self.good_detection = False
+            return
 
-            if not ok:
-                self.good_detection = False
-                return
+        ok, tag_rotation, tag_position, _ = cv2.solvePnPRansac(
+            objectPoints=object_pts,
+            imagePoints=image_pts,
+            cameraMatrix=self.new_K,
+            distCoeffs=zeroed_D,
+            rvec=tag_rotation,
+            tvec=tag_position,
+            useExtrinsicGuess=True,
+        )
 
-            # if detection.tag_id == 0:
-            self.reprojection_errors.append(error)
+        if not ok:
+            self.good_detection = False
+            return
 
-            # corners = detection.corners
-            # corners = [np.roll(corner_array, 2, axis=1) for corner_array in corners]
-            # self.tag_corners.append(corners)
+        tag_rotation, tag_position = cv2.solvePnPRefineVVS(
+            object_pts,
+            image_pts,
+            self.new_K,
+            zeroed_D,
+            tag_rotation,
+            tag_position,
+        )
 
-            # 1 is BL
-            # 2 is BR
-            # 3 is TR
-            # 4 is TL
-            self.tag_corners.append(detection.corners)
-            self.tag_ids.append(detection.tag_id)
+        rotation_matrix, _ = cv2.Rodrigues(tag_rotation)
 
-    def extract_tag_poses(self):
-        for detection in self.at_detection:
-            tag_pose = Pose(
-                position=detection.pose_t.flatten(),
-                rotation=detection.pose_R,
-            )
+        rotation_matrix[:, 2] *= -1
 
-            self.tag_poses.append(tag_pose)
+        self.error = error
+
+        self.pose = Pose(
+            tag_position.flatten(),
+            rotation_matrix,
+        )
