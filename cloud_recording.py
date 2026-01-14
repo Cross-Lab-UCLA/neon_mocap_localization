@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-import numpy as np
 import av
 import cv2
+import numpy as np
 import pandas as pd
 
 
@@ -54,9 +54,9 @@ class Gaze:
         self.rec_path = rec_path
 
         self.data_csv = pd.read_csv(rec_path / "gaze.csv")
-        self.time = self.data["timestamp [ns]"].to_numpy()
+        self.time = self.data_csv["timestamp [ns]"].to_numpy()
 
-        self.nframes = len(self.data)
+        self.nframes = len(self.data_csv)
 
         self.data = {}
         self.data["point_x"] = self.data_csv["gaze x [px]"]
@@ -77,6 +77,13 @@ class Calibration:
         )
 
 
+class Events:
+    def __init__(self, rec_path):
+        self.events_path = rec_path / "events.csv"
+
+        self.data = pd.read_csv(self.events_path)
+
+
 class CloudRecording:
     def __init__(self, directory):
         self.directory = Path(directory)
@@ -87,3 +94,5 @@ class CloudRecording:
 
         self.scene = Scene(self.directory)
         self.calibration = Calibration(self.directory)
+        self.gaze = Gaze(self.directory)
+        self.events = Events(self.directory)

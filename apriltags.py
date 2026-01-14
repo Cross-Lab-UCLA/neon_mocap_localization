@@ -60,46 +60,46 @@ class AprilTags:
         image_pts = at_tag_pts.reshape(-1, 2)
         object_pts = self.tag_corner_coordinates.reshape(-1, 3)
 
-        ok, (tag_rotation,), (tag_position,), (error,) = cv2.solvePnPGeneric(
+        ok, tag_rotation, tag_position, error = cv2.solvePnPGeneric(
             objectPoints=object_pts,
             imagePoints=image_pts,
             cameraMatrix=self.new_K,
             distCoeffs=zeroed_D,
-            flags=cv2.SOLVEPNP_ITERATIVE,
+            flags=cv2.SOLVEPNP_SQPNP,
         )
 
         if not ok:
             self.good_detection = False
             return
 
-        ok, tag_rotation, tag_position, _ = cv2.solvePnPRansac(
-            objectPoints=object_pts,
-            imagePoints=image_pts,
-            cameraMatrix=self.new_K,
-            distCoeffs=zeroed_D,
-            rvec=tag_rotation,
-            tvec=tag_position,
-            useExtrinsicGuess=True,
-        )
+        # ok, tag_rotation, tag_position, _ = cv2.solvePnPRansac(
+        #     objectPoints=object_pts,
+        #     imagePoints=image_pts,
+        #     cameraMatrix=self.new_K,
+        #     distCoeffs=zeroed_D,
+        #     rvec=tag_rotation[0],
+        #     tvec=tag_position[0],
+        #     useExtrinsicGuess=True,
+        # )
 
-        if not ok:
-            self.good_detection = False
-            return
+        # if not ok:
+        #     self.good_detection = False
+        #     return
 
         tag_rotation, tag_position = cv2.solvePnPRefineVVS(
             object_pts,
             image_pts,
             self.new_K,
             zeroed_D,
-            tag_rotation,
-            tag_position,
+            tag_rotation[0],
+            tag_position[0],
         )
 
         rotation_matrix, _ = cv2.Rodrigues(tag_rotation)
 
         rotation_matrix[:, 2] *= -1
 
-        self.error = error
+        self.error = error[0]
 
         self.pose = Pose(
             tag_position.flatten(),

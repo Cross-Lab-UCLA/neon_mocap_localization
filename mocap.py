@@ -87,19 +87,29 @@ class MocapAprilTag:
 class MocapSurface:
     def __init__(self):
         self.apriltags = []
+        self.markers = []
 
     def add_apriltag(self, apriltag):
         self.apriltags.append(apriltag)
+
+    def add_marker(self, marker):
+        self.markers.append(marker)
 
     def construct_pose(self, orient_towards=None):
         """
         Construct the estimated pose of the surface in mocap system.
         """
 
-        apriltag = []
         xs, ys, zs = [], [], []
-        for apriltag in self.apriltags:
-            for marker in apriltag.markers:
+        if not len(self.apriltags) == 0:
+            apriltag = []
+            for apriltag in self.apriltags:
+                for marker in apriltag.markers:
+                    xs.append(marker.Xs)
+                    ys.append(marker.Ys)
+                    zs.append(marker.Zs)
+        else:
+            for marker in self.markers:
                 xs.append(marker.Xs)
                 ys.append(marker.Ys)
                 zs.append(marker.Zs)

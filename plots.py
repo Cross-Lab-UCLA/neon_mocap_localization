@@ -160,15 +160,33 @@ def plot_neon_in_mocap(
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
-    cols = ["r", "g", "b", "k"]
-    for ac, apriltag in enumerate(mocap_surface.apriltags):
-        for mc, marker in enumerate(apriltag.markers):
-            if ac == 0 and mc == 0:
+    if len(mocap_surface.apriltags):
+        cols = ["r", "g", "b", "k"]
+        for ac, apriltag in enumerate(mocap_surface.apriltags):
+            for mc, marker in enumerate(apriltag.markers):
+                if ac == 0 and mc == 0:
+                    ax.plot(
+                        marker.Xs,
+                        marker.Ys,
+                        marker.Zs,
+                        cols[marker.id] + "o",
+                        label="Tag Markers",
+                    )
+                else:
+                    ax.plot(
+                        marker.Xs,
+                        marker.Ys,
+                        marker.Zs,
+                        cols[marker.id] + "o",
+                    )
+    else:
+        for mc, marker in enumerate(mocap_surface.markers):
+            if mc == 0:
                 ax.plot(
                     marker.Xs,
                     marker.Ys,
                     marker.Zs,
-                    cols[marker.id] + "o",
+                    "ko",
                     label="Tag Markers",
                 )
             else:
@@ -176,7 +194,7 @@ def plot_neon_in_mocap(
                     marker.Xs,
                     marker.Ys,
                     marker.Zs,
-                    cols[marker.id] + "o",
+                    "ko",
                 )
 
     for c, marker in enumerate(mocap_head.markers):
@@ -236,8 +254,18 @@ def plot_surface_local_coordinate_system_in_mocap(mocap_surface):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
-    for apriltag in mocap_surface.apriltags:
-        for marker in apriltag.markers:
+    if len(mocap_surface.apriltags) > 0:
+        for apriltag in mocap_surface.apriltags:
+            for marker in apriltag.markers:
+                ax.scatter(
+                    marker.Xs,
+                    marker.Ys,
+                    marker.Zs,
+                    color="k",
+                    s=50,
+                )
+    else:
+        for marker in mocap_surface.markers:
             ax.scatter(
                 marker.Xs,
                 marker.Ys,

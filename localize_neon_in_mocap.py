@@ -113,7 +113,9 @@ for frame in tqdm(range(int(nframes))):
     else:
         markers_for_calib = marker_positions.iloc[len(marker_positions) // 2]
 
-    if np.isnan(markers_for_calib["T1TL_X"]).any():
+    if (
+        "T1TL_X" in markers_for_calib and np.isnan(markers_for_calib["T1TL_X"]).any()
+    ) or ("TL" in markers_for_calib and np.isnan(markers_for_calib["TL"]).any()):
         continue
 
     if is_cloud_rec:
@@ -141,13 +143,16 @@ for frame in tqdm(range(int(nframes))):
     # apriltag_pose_in_mocap = neon._convert_to_mocap_format(neon_apriltags.pose)
     neon.set_pose(neon_apriltags.pose.inverse())
 
-
-diffs = (marker_positions["timestamp [ns]"] - best_timestamp).abs()
-markers_for_calib = marker_positions.iloc[diffs.idxmin()]
+if "timestamp [ns]" in marker_positions:
+    diffs = (marker_positions["timestamp [ns]"] - best_timestamp).abs()
+    markers_for_calib = marker_positions.iloc[diffs.idxmin()]
+else:
+    markers_for_calib = marker_positions.iloc[len(marker_positions) // 2]
 
 # holds the mocap surface data for a collection of AprilTags
 mocap_surface = MocapSurface()
 
+found_one = False
 for tag_id, tag_num in enumerate(["1", "2", "3", "4"]):
     mocap_apriltag = MocapAprilTag(tag_id)
 
@@ -162,6 +167,11 @@ for tag_id, tag_num in enumerate(["1", "2", "3", "4"]):
         "TL": 3,
     }
     for tag_corner in ["BL", "BR", "TR", "TL"]:
+        if not f"T{tag_num}{tag_corner}_X" in markers_for_calib:
+            continue
+        else:
+            found_one = True
+
         marker_pos_X = markers_for_calib[f"T{tag_num}{tag_corner}_X"].squeeze() / 1000
         marker_pos_Y = markers_for_calib[f"T{tag_num}{tag_corner}_Y"].squeeze() / 1000
         marker_pos_Z = markers_for_calib[f"T{tag_num}{tag_corner}_Z"].squeeze() / 1000
@@ -172,8 +182,21 @@ for tag_id, tag_num in enumerate(["1", "2", "3", "4"]):
             )
         )
 
-    mocap_apriltag.estimate_tag_center()
-    mocap_surface.add_apriltag(mocap_apriltag)
+    if found_one:
+        mocap_apriltag.estimate_tag_center()
+        mocap_surface.add_apriltag(mocap_apriltag)
+
+# we have markers that are not assigned to apriltags
+if not found_one:
+    for marker in ["TL", "TR", "ML", "MR", "BL", "BR"]:
+        marker_pos_X = markers_for_calib[f"{marker}_X"].squeeze() / 1000
+        marker_pos_Y = markers_for_calib[f"{marker}_Y"].squeeze() / 1000
+        marker_pos_Z = markers_for_calib[f"{marker}_Z"].squeeze() / 1000
+
+        mocap_surface.add_marker(
+            MocapIRMarker(marker_pos_X, marker_pos_Y, marker_pos_Z, marker)
+        )
+
 
 # extract the marker positions for the head pose into a convenient object
 mocap_head = MocapHead()
