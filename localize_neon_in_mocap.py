@@ -34,8 +34,11 @@ parser.add_argument(
     help="The path to the MoCap data (CSV; in Neon timebase)",
     required=True,
 )
+# load config
 
-args = vars(parser.parse_args())
+config = []
+with open(args["config_path"], "r") as f:
+    config = json.load(f)
 
 # load data
 
@@ -65,15 +68,30 @@ marker_positions = pd.read_csv(args["mocap_path"])
 # order for corners of each tag should be -> BL BR TR TL
 # x, y, z
 # units should be meters
-tag_corner_coordinates = pd.read_csv(args["coordinates_path"], header=None).to_numpy()
-tag_corner_coordinates *= 2.54
-tag_corner_coordinates *= 0.01
+tag_corner_coordinates = config["apriltag_corner_local_coordinates"]
+plane_width = 0
+plane_height = 0
+for k, v in tag_corner_coordinates.items():
+    m = np.zeros((len(v), 3), dtype=np.float32)
+    # v = np.array(v) * 0.00015240000000000002
+    # v = np.array(v) * 2.54 * 0.01
+    v = np.array(v) * 0.01
 
-plane_width = np.max(tag_corner_coordinates[:, 0])
-plane_height = np.max(tag_corner_coordinates[:, 1])
+    m[:, :2] = v
 
-tag_corner_coordinates[:, 0] -= plane_width / 2
-tag_corner_coordinates[:, 1] -= plane_height / 2
+    tag_corner_coordinates[k] = m
+
+    if np.max(v[:, 0]) > plane_width:
+        plane_width = np.max(v[:, 0])
+
+    if np.max(v[:, 1]) > plane_height:
+        plane_height = np.max(v[:, 1])
+
+for k, v in tag_corner_coordinates.items():
+    v[:, 0] -= plane_width / 2
+    v[:, 1] -= plane_height / 2
+
+    tag_corner_coordinates[k] = v
 
 plane_points_3d = np.array(
     [
@@ -113,9 +131,9 @@ for frame in tqdm(range(int(nframes))):
     else:
         markers_for_calib = marker_positions.iloc[len(marker_positions) // 2]
 
-    if (
-        "T1TL_X" in markers_for_calib and np.isnan(markers_for_calib["T1TL_X"]).any()
-    ) or ("TL" in markers_for_calib and np.isnan(markers_for_calib["TL"]).any()):
+    if f"{config['apriltag_marker_labels'][0]}_X" in markers_for_calib and np.isnan(
+        markers_for_calib[f"{config['apriltag_marker_labels'][0]}_X"].any()
+    ):
         continue
 
     if is_cloud_rec:
@@ -152,75 +170,31 @@ else:
 # holds the mocap surface data for a collection of AprilTags
 mocap_surface = MocapSurface()
 
-found_one = False
-for tag_id, tag_num in enumerate(["1", "2", "3", "4"]):
-    mocap_apriltag = MocapAprilTag(tag_id)
+for marker in config["apriltag_marker_labels"]:
+    marker_pos_X = markers_for_calib[f"{marker}_X"].squeeze() / 1000
+    marker_pos_Y = markers_for_calib[f"{marker}_Y"].squeeze() / 1000
+    marker_pos_Z = markers_for_calib[f"{marker}_Z"].squeeze() / 1000
 
-    # 1 is BL
-    # 2 is BR
-    # 3 is TR
-    # 4 is TL
-    tag_id_mapping = {
-        "BL": 0,
-        "BR": 1,
-        "TR": 2,
-        "TL": 3,
-    }
-    for tag_corner in ["BL", "BR", "TR", "TL"]:
-        if not f"T{tag_num}{tag_corner}_X" in markers_for_calib:
-            continue
-        else:
-            found_one = True
-
-        marker_pos_X = markers_for_calib[f"T{tag_num}{tag_corner}_X"].squeeze() / 1000
-        marker_pos_Y = markers_for_calib[f"T{tag_num}{tag_corner}_Y"].squeeze() / 1000
-        marker_pos_Z = markers_for_calib[f"T{tag_num}{tag_corner}_Z"].squeeze() / 1000
-
-        mocap_apriltag.add_marker(
-            MocapIRMarker(
-                marker_pos_X, marker_pos_Y, marker_pos_Z, tag_id_mapping[tag_corner]
-            )
-        )
-
-    if found_one:
-        mocap_apriltag.estimate_tag_center()
-        mocap_surface.add_apriltag(mocap_apriltag)
-
-# we have markers that are not assigned to apriltags
-if not found_one:
-    for marker in ["TL", "TR", "ML", "MR", "BL", "BR"]:
-        marker_pos_X = markers_for_calib[f"{marker}_X"].squeeze() / 1000
-        marker_pos_Y = markers_for_calib[f"{marker}_Y"].squeeze() / 1000
-        marker_pos_Z = markers_for_calib[f"{marker}_Z"].squeeze() / 1000
-
-        mocap_surface.add_marker(
-            MocapIRMarker(marker_pos_X, marker_pos_Y, marker_pos_Z, marker)
-        )
-
+    mocap_surface.add_marker(
+        MocapIRMarker(marker_pos_X, marker_pos_Y, marker_pos_Z, marker)
+    )
 
 # extract the marker positions for the head pose into a convenient object
 mocap_head = MocapHead()
 
-neon_marker_num = 1
-while True:
-    marker_name = f"NEON_MARKER_{neon_marker_num}"
-    if marker_name + "_X" not in markers_for_calib.keys():
-        break
-
-    marker_pos_X = markers_for_calib[f"{marker_name}_X"].squeeze() / 1000
-    marker_pos_Y = markers_for_calib[f"{marker_name}_Y"].squeeze() / 1000
-    marker_pos_Z = markers_for_calib[f"{marker_name}_Z"].squeeze() / 1000
+for id, marker in enumerate(config["neon_marker_labels"]):
+    marker_pos_X = markers_for_calib[f"{marker}_X"].squeeze() / 1000
+    marker_pos_Y = markers_for_calib[f"{marker}_Y"].squeeze() / 1000
+    marker_pos_Z = markers_for_calib[f"{marker}_Z"].squeeze() / 1000
 
     mocap_head.add_marker(
         MocapIRMarker(
             marker_pos_X,
             marker_pos_Y,
             marker_pos_Z,
-            neon_marker_num,
+            id,
         )
     )
-
-    neon_marker_num += 1
 
 mocap_surface.construct_pose(
     orient_towards=np.array(
