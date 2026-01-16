@@ -19,15 +19,13 @@ class Surface:
         self.y_axis = None
         self.normal = None
 
-    def add_pose(self, pose):
+    def set_pose(self, pose):
         self.pose = pose
 
         self.x_axis = pose.rotation[:, 0]
         self.y_axis = pose.rotation[:, 1]
         self.normal = pose.rotation[:, 2]
 
-        self.x_axis /= np.linalg.norm(pose.rotation[:, 0])
-        self.y_axis /= np.linalg.norm(pose.rotation[:, 1])
-        self.normal /= np.linalg.norm(pose.rotation[:, 2])
-
-        # self.normal *= -1
+        self.x_axis /= np.linalg.norm(self.x_axis)
+        self.y_axis /= np.linalg.norm(self.y_axis)
+        self.normal /= np.linalg.norm(self.normal)
