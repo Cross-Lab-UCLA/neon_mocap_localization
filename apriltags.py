@@ -24,17 +24,24 @@ class AprilTags:
     def detect_tags_and_extract_pose(self, image):
         img_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
-        self.new_K, _ = cv2.getOptimalNewCameraMatrix(
-            self.K, self.D, img_gray.shape[::-1], 1, img_gray.shape[::-1]
-        )
-        self.undist_frame = cv2.undistort(
-            img_gray, self.K, self.D, None, newCameraMatrix=self.new_K
-        )
+        # self.new_K, _ = cv2.getOptimalNewCameraMatrix(
+        #     self.K, self.D, img_gray.shape[::-1], 1, img_gray.shape[::-1]
+        # )
+        # self.undist_frame = cv2.undistort(
+        #     img_gray, self.K, self.D, None, newCameraMatrix=self.new_K
+        # )
 
-        fx = self.new_K[0, 0]
-        fy = self.new_K[1, 1]
-        cx = self.new_K[0, 2]
-        cy = self.new_K[1, 2]
+        self.undist_frame = cv2.undistort(img_gray, self.K, self.D)
+
+        # fx = self.new_K[0, 0]
+        # fy = self.new_K[1, 1]
+        # cx = self.new_K[0, 2]
+        # cy = self.new_K[1, 2]
+
+        fx = self.K[0, 0]
+        fy = self.K[1, 1]
+        cx = self.K[0, 2]
+        cy = self.K[1, 2]
 
         try:
             self.at_detection = self.detector.detect(
@@ -63,7 +70,7 @@ class AprilTags:
         ok, tag_rotation, tag_position, error = cv2.solvePnPGeneric(
             objectPoints=object_pts,
             imagePoints=image_pts,
-            cameraMatrix=self.new_K,
+            cameraMatrix=self.K,
             distCoeffs=zeroed_D,
             flags=cv2.SOLVEPNP_SQPNP,
         )
@@ -75,7 +82,7 @@ class AprilTags:
         # ok, tag_rotation, tag_position, _ = cv2.solvePnPRansac(
         #     objectPoints=object_pts,
         #     imagePoints=image_pts,
-        #     cameraMatrix=self.new_K,
+        #     cameraMatrix=self.K,
         #     distCoeffs=zeroed_D,
         #     rvec=tag_rotation[0],
         #     tvec=tag_position[0],
@@ -89,7 +96,7 @@ class AprilTags:
         tag_rotation, tag_position = cv2.solvePnPRefineVVS(
             object_pts,
             image_pts,
-            self.new_K,
+            self.K,
             zeroed_D,
             tag_rotation[0],
             tag_position[0],
