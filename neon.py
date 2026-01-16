@@ -28,8 +28,8 @@ class Neon:
         R = np.array(
             [
                 [1, 0, 0],
-                [0, 0, 1],
                 [0, 1, 0],
+                [0, 0, 1],
             ]
         )
 
@@ -46,7 +46,7 @@ class Neon:
             raise ValueError("Pose in surface coordinates is not set.")
 
         # self.pose_in_surface_mocap = self._convert_to_mocap_format(self.pose)
-        self.pose_in_mocap = surface_pose_mocap.apply(self.pose)
+        # self.pose_in_mocap = surface_pose_mocap.apply(self.pose_in_surface_mocap)
 
-        # self.pose_in_mocap = surface_pose_mocap.apply(self.pose)
+        self.pose_in_mocap = surface_pose_mocap.apply(self.pose)
         # self.pose_in_mocap = self._convert_to_mocap_format(self.pose_in_mocap)
