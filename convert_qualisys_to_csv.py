@@ -9,26 +9,32 @@ import pupil_labs.neon_recording as plnr
 import pyxdf
 import scipy.io as sio
 from ezc3d import c3d
+from scipy import signal
 from scipy.interpolate import interp1d
 
 from threed_utils import unproject_points
 
 
+def normalize(x):
+    return (x - np.mean(x)) / np.std(x)
+
+
 def align_signals(x, y, y_ts):
-    max_corr_idx = np.argmax(np.correlate(x, y, mode="full"))
-    lag = max_corr_idx - (len(y) - 1)
+    if np.isnan(x).any():
+        x[np.isnan(x)] = np.nanmean(x)
 
-    if lag < 0:
-        x_time_in_y = y_ts[-lag:]
-        x_idxs_in_y = list(range(-lag, len(y_ts)))
-    else:
-        x_time_in_y = y_ts[:lag]
-        x_idxs_in_y = list(range(0, lag))
+    if np.isnan(y).any():
+        y[np.isnan(y)] = np.nanmean(y)
 
-    return x_time_in_y, x_idxs_in_y, lag
+    x_norm = normalize(x)
+    y_norm = normalize(y)
 
+    max_corr_idx = np.argmax(np.correlate(y_norm, x_norm, mode="valid"))
+    # max_corr_idx = np.argmax(signal.correlate(x_norm, y_norm, mode="valid"))
+    # lag = max_corr_idx - (len(y) - 1)
 
-# parse args
+    x_time_in_y = y_ts[max_corr_idx : (max_corr_idx + len(x))]
+    x_idxs_in_y = list(range(max_corr_idx, (max_corr_idx + len(x))))
 
 parser = argparse.ArgumentParser(
     description="Determines relative position of Neon scene camera in MoCap coordinate system"
@@ -82,6 +88,10 @@ c3d_path = args["c3d_path"]
 num_neon_markers = args["num_neon_markers"]
 output_path = args["output_path"]
 
+config = []
+with open(args["config_path"], "r") as f:
+    config = json.load(f)
+
 # load qualisys data
 
 data = sio.loadmat(mocap_mat_path)
@@ -103,11 +113,11 @@ nsamples = marker_positions.shape[2]
 marker_names = data[condition_name][0][0][5][0][0][0][0][0][1][0]
 marker_indices = {str(name[0]): idx for idx, name in enumerate(marker_names)}
 
-if os.path.exists("tag_name_mapping.json"):
-    tag_name_mapping = {}
-    with open("tag_name_mapping.json", "r") as f:
-        tag_name_mapping = json.load(f)
-        reverse_tag_name_mapping = {v: k for k, v in tag_name_mapping.items()}
+# if os.path.exists("tag_name_mapping.json"):
+#     tag_name_mapping = {}
+#     with open("tag_name_mapping.json", "r") as f:
+#         tag_name_mapping = json.load(f)
+#         reverse_tag_name_mapping = {v: k for k, v in tag_name_mapping.items()}
 
 # timesync with neon data
 
@@ -145,7 +155,7 @@ reference_positions_xdf = (
 # determine which part of QTM data the LSL recording corresponds
 # to via cross-correlation alignment
 
-time_qtm_in_xdf, idxs_qtm_in_xdf, lag_qtm_xdf = align_signals(
+time_qtm_in_xdf, idxs_qtm_in_xdf = align_signals(
     reference_positions[0, :].squeeze(),
     reference_positions_xdf[:, 0].squeeze(),
     reference_timestamps_xdf,
@@ -163,7 +173,7 @@ plt.show()
 # determine offset between neon and LSL recording via
 # cross-correlation alignment
 
-time_gaze_in_xdf, idxs_gaze_in_xdf, lag_gaze_xdf = align_signals(
+time_gaze_in_xdf, idxs_gaze_in_xdf = align_signals(
     neon_rec.gaze.data["point_x"],
     xdf_data[0][neon_xdf_idx]["time_series"][:, 0],
     xdf_data[0][neon_xdf_idx]["time_stamps"],
@@ -196,29 +206,10 @@ marker_positions = marker_positions[
 
 # make dataframe to export as csv
 
-cols = [
-    f"T{tc}{corner}"
-    for tc in ["1", "2", "3", "4"]
-    for corner in ["TL", "TR", "BR", "BL"]
-]
-cols += [f"NEON_MARKER_{n + 1}" for n in range(args["num_neon_markers"])]
-for key in marker_indices.keys():
-    if key in reverse_tag_name_mapping:
-        continue
-
-    cols += [key]
-
-# cols += list(marker_indices.keys())
-
 marker_df = pd.DataFrame()
-
 marker_df["timestamp [ns]"] = neon_rec.gaze.time
-
-for marker in cols:
-    if marker in tag_name_mapping:
-        index = marker_indices[tag_name_mapping[marker]]
-    else:
-        index = marker_indices[marker]
+for marker in config["apriltag_marker_labels"] + config["neon_marker_labels"]:
+    index = marker_indices[marker]
 
     marker_pos = marker_positions[index].squeeze()
 
