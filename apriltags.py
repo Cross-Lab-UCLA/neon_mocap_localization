@@ -64,8 +64,15 @@ class AprilTags:
         for detection in self.at_detection:
             at_tag_pts[detection.tag_id] = detection.corners
 
+        object_pts = []
+        for v in self.tag_corner_coordinates.values():
+            for r in v:
+                object_pts.append(r)
+
+        object_pts = np.array(object_pts)
+
         image_pts = at_tag_pts.reshape(-1, 2)
-        object_pts = self.tag_corner_coordinates.reshape(-1, 3)
+        object_pts = object_pts.reshape(-1, 3)
 
         ok, tag_rotation, tag_position, error = cv2.solvePnPGeneric(
             objectPoints=object_pts,
