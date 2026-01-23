@@ -152,8 +152,55 @@ for frame in tqdm(range(int(nframes))):
     if apriltag_img is None:
         continue
 
+    surface_gaze_image_pts = None
+    surface_gaze_object_pts = None
+    if not args["surface_path"] == "":
+        surface_positions = pd.read_csv(args["surface_path"])
+
+        gaze_on_surface_x = (
+            surface_positions["gaze position on surface x [normalized]"].to_numpy()
+            * plane_width
+        ) - plane_width / 2
+        gaze_on_surface_y = (
+            surface_positions["gaze position on surface y [normalized]"].to_numpy()
+            * plane_height
+        ) - plane_height / 2
+
+        good_idxs = (gaze_on_surface_x < 1.0) & (gaze_on_surface_x > 0.0)
+        good_gaze_on_surface_x = gaze_on_surface_x[good_idxs]
+        good_gaze_on_surface_y = gaze_on_surface_y[good_idxs]
+
+        good_gaze_on_surface_ts = surface_positions.iloc[good_idxs][
+            "timestamp [ns]"
+        ].to_numpy()
+
+        surface_gaze_object_pts = np.zeros(
+            (len(good_gaze_on_surface_ts), 3), dtype=np.float32
+        )
+        surface_gaze_object_pts[:, 0] = good_gaze_on_surface_x
+        surface_gaze_object_pts[:, 1] = good_gaze_on_surface_y
+
+        surface_gaze_object_pts = (
+            config["T_neon_to_mocap"] @ surface_gaze_object_pts.T
+        ).T
+
+        good_gaze_2d = neon_rec.gaze.sample(good_gaze_on_surface_ts)
+
+        surface_gaze_image_pts = np.zeros(
+            (len(good_gaze_on_surface_ts), 2), dtype=np.float32
+        )
+        surface_gaze_image_pts[:, 0] = good_gaze_2d.data["point_x"]
+        surface_gaze_image_pts[:, 1] = good_gaze_2d.data["point_y"]
+
     neon_apriltags = AprilTags(
-        apriltag_detector, neon, 0.132, apriltag_img, tag_corner_coordinates
+        apriltag_detector,
+        neon,
+        config["apriltag_black_border_width"],
+        apriltag_img,
+        tag_corner_coordinates,
+        config["apriltags_to_use"],
+        surface_gaze_object_pts,
+        surface_gaze_image_pts,
     )
     if neon_apriltags.good_detection:
         if neon_apriltags.error < smallest_error:
