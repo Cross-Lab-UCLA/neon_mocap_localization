@@ -265,14 +265,17 @@ neon.calculate_pose_in_mocap(mocap_surface.pose)
 neon_marker_positions_in_mocap = np.array(
     [[ir_marker.Xs, ir_marker.Ys, ir_marker.Zs] for ir_marker in mocap_head.markers]
 ).T
-avg_neon_marker_positions = np.mean(neon_marker_positions_in_mocap, axis=1)
+avg_neon_marker_positions = np.nanmean(neon_marker_positions_in_mocap, axis=1)
 
-# print("Avg distance from neon markers to plane markers: ")
-# print(np.linalg.norm(avg_neon_marker_positions - mocap_surface.centroid))
+print("Avg position of neon markers: ")
+print(avg_neon_marker_positions)
 
 neon_camera_position_relative_to_markers = (
     neon.pose_in_mocap.position - avg_neon_marker_positions
 )
+
+print("Neon position relative to markers: ")
+print(neon_camera_position_relative_to_markers)
 
 neon_camera_pose_relative_to_markers = Pose(
     position=neon_camera_position_relative_to_markers,
