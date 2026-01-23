@@ -124,6 +124,9 @@ marker_indices = {str(name[0]): idx for idx, name in enumerate(marker_names)}
 reference_positions = marker_positions[
     marker_indices[args["reference_marker"]]
 ].squeeze()
+trim_begin = 1800
+trim_end = -1800
+reference_positions = reference_positions[:, trim_begin:trim_end]
 reference_duration = reference_positions.shape[-1] / 200
 reference_timestamps = np.arange(0, reference_duration, 1 / 200)
 
@@ -212,6 +215,7 @@ for marker in config["apriltag_marker_labels"] + config["neon_marker_labels"]:
     index = marker_indices[marker]
 
     marker_pos = marker_positions[index].squeeze()
+    marker_pos = marker_pos[:, trim_begin:trim_end]
 
     # re-interpolate qtm data to correspond exactly to neon data
 
