@@ -287,73 +287,67 @@ print(
 # - gaze origin in mocap coord sys at each frame
 # - gaze direction in mocap coord sys at each frame
 
-# gaze_origin_Xs = np.zeros(len(marker_positions))
-# gaze_origin_Ys = np.zeros(len(marker_positions))
-# gaze_origin_Zs = np.zeros(len(marker_positions))
+gaze_origin_Xs = np.zeros(len(marker_positions))
+gaze_origin_Ys = np.zeros(len(marker_positions))
+gaze_origin_Zs = np.zeros(len(marker_positions))
 
-# gaze_dir_Xs = np.zeros(len(marker_positions))
-# gaze_dir_Ys = np.zeros(len(marker_positions))
-# gaze_dir_Zs = np.zeros(len(marker_positions))
+gaze_dir_Xs = np.zeros(len(marker_positions))
+gaze_dir_Ys = np.zeros(len(marker_positions))
+gaze_dir_Zs = np.zeros(len(marker_positions))
 
-# for frame in tqdm(range(len(marker_positions))):
-#     marker_timestamp = marker_positions["timestamp [ns]"].iloc[frame]
+for frame in tqdm(range(len(marker_positions))):
+    marker_timestamp = int(marker_positions["timestamp [ns]"].iloc[frame])
 
-#     # find the equivalent neon data based on marker timestamp
-#     idx = np.searchsorted(neon_rec.gaze.time, marker_timestamp)
+    # find the equivalent neon data based on marker timestamp
+    idx = np.searchsorted(neon_rec.gaze.time, marker_timestamp)
 
-#     gaze_x = neon_rec.gaze.data["point_x"][idx]
-#     gaze_y = neon_rec.gaze.data["point_y"][idx]
+    gaze_x = neon_rec.gaze.data["point_x"][idx]
+    gaze_y = neon_rec.gaze.data["point_y"][idx]
 
-#     gaze_dir = threed_utils.unproject_points(
-#         np.array([gaze_x, gaze_y]),
-#         neon_rec.calibration.scene_camera_matrix,
-#         neon_rec.calibration.scene_distortion_coefficients,
-#         normalize=True,
-#     )
+    gaze_dir = threed_utils.unproject_points(
+        np.array([gaze_x, gaze_y]),
+        neon_rec.calibration.scene_camera_matrix,
+        neon_rec.calibration.scene_distortion_coefficients,
+        normalize=True,
+    )
 
-#     gaze_dir_mocap = (R_neon_to_mocap @ gaze_dir.reshape(3, -1)).squeeze()
-#     gaze_dir_Xs[frame] = gaze_dir_mocap[0]
-#     gaze_dir_Ys[frame] = gaze_dir_mocap[1]
-#     gaze_dir_Zs[frame] = gaze_dir_mocap[2]
+    gaze_dir_mocap = (gaze_dir.reshape(3, -1)).squeeze()
+    gaze_dir_mocap = neon_camera_pose_relative_to_markers.rotation @ gaze_dir_mocap
+    gaze_dir_Xs[frame] = gaze_dir_mocap[0]
+    gaze_dir_Ys[frame] = gaze_dir_mocap[1]
+    gaze_dir_Zs[frame] = gaze_dir_mocap[2]
 
-#     markers_for_calib = marker_positions.iloc[frame]
+    markers_for_calib = marker_positions.iloc[frame]
 
-#     neon_marker_num = 1
-#     marker_pos_X = []
-#     marker_pos_Y = []
-#     marker_pos_Z = []
-#     while True:
-#         marker_name = f"NEON_MARKER_{neon_marker_num}"
-#         if marker_name + "_X" not in markers_for_calib.keys():
-#             break
+    marker_pos_X = []
+    marker_pos_Y = []
+    marker_pos_Z = []
+    for id, marker in enumerate(config["neon_marker_labels"]):
+        marker_pos_X.append(markers_for_calib[f"{marker}_X"].squeeze())
+        marker_pos_Y.append(markers_for_calib[f"{marker}_Y"].squeeze())
+        marker_pos_Z.append(markers_for_calib[f"{marker}_Z"].squeeze())
 
-#         marker_pos_X.append(markers_for_calib[f"{marker_name}_X"].squeeze())
-#         marker_pos_Y.append(markers_for_calib[f"{marker_name}_Y"].squeeze())
-#         marker_pos_Z.append(markers_for_calib[f"{marker_name}_Z"].squeeze())
+    avg_neon_marker_position = np.array(
+        [
+            np.nanmean(marker_pos_X),
+            np.nanmean(marker_pos_Y),
+            np.nanmean(marker_pos_Z),
+        ]
+    )
 
-#         neon_marker_num += 1
+    gaze_origin_mocap = (
+        neon_camera_position_relative_to_markers * 1000 + avg_neon_marker_position
+    )
+    gaze_origin_Xs[frame] = gaze_origin_mocap[0]
+    gaze_origin_Ys[frame] = gaze_origin_mocap[1]
+    gaze_origin_Zs[frame] = gaze_origin_mocap[2]
 
-#     avg_neon_marker_position = np.array(
-#         [
-#             np.mean(marker_pos_X),
-#             np.mean(marker_pos_Y),
-#             np.mean(marker_pos_Z),
-#         ]
-#     )
+marker_positions["gaze_origin_X"] = gaze_origin_Xs
+marker_positions["gaze_origin_Y"] = gaze_origin_Ys
+marker_positions["gaze_origin_Z"] = gaze_origin_Zs
 
-#     gaze_origin_mocap = (
-#         neon_camera_position_relative_to_markers + avg_neon_marker_position
-#     )
-#     gaze_origin_Xs[frame] = gaze_origin_mocap[0]
-#     gaze_origin_Ys[frame] = gaze_origin_mocap[1]
-#     gaze_origin_Zs[frame] = gaze_origin_mocap[2]
+marker_positions["gaze_dir_X"] = gaze_dir_Xs
+marker_positions["gaze_dir_Y"] = gaze_dir_Ys
+marker_positions["gaze_dir_Z"] = gaze_dir_Zs
 
-# marker_positions["gaze_origin_X"] = gaze_origin_Xs
-# marker_positions["gaze_origin_Y"] = gaze_origin_Ys
-# marker_positions["gaze_origin_Z"] = gaze_origin_Zs
-
-# marker_positions["gaze_dir_X"] = gaze_dir_Xs
-# marker_positions["gaze_dir_Y"] = gaze_dir_Ys
-# marker_positions["gaze_dir_Z"] = gaze_dir_Zs
-
-# marker_positions.to_csv("marker_positions_w_gaze.csv")
+marker_positions.to_csv("marker_positions_w_gaze.csv")
