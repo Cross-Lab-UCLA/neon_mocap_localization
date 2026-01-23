@@ -13,9 +13,6 @@ from apriltags import AprilTags
 from cloud_recording import CloudRecording
 from mocap import MocapAprilTag, MocapHead, MocapIRMarker, MocapSurface
 from neon import Neon
-from plots import (plot_apriltags_in_neon, plot_neon_in_mocap,
-                   plot_neon_in_surface,
-                   plot_surface_local_coordinate_system_in_mocap)
 from plots import (
     plot_apriltags_in_neon,
     plot_neon_in_mocap,
