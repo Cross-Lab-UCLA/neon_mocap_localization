@@ -8,6 +8,7 @@ import pupil_labs.neon_recording as plnr
 from pupil_apriltags import Detector
 from tqdm import tqdm
 
+import threed_utils
 from apriltags import AprilTags
 from cloud_recording import CloudRecording
 from mocap import MocapAprilTag, MocapHead, MocapIRMarker, MocapSurface
@@ -15,6 +16,12 @@ from neon import Neon
 from plots import (plot_apriltags_in_neon, plot_neon_in_mocap,
                    plot_neon_in_surface,
                    plot_surface_local_coordinate_system_in_mocap)
+from plots import (
+    plot_apriltags_in_neon,
+    plot_neon_in_mocap,
+    plot_neon_in_surface,
+    plot_surface_local_coordinate_system_in_mocap,
+)
 from pose import Pose
 
 # from surface import Surface
@@ -66,16 +73,14 @@ marker_positions = pd.read_csv(args["mocap_path"])
 # tags should be listed in order of increasing ID
 # should be tag 0, tag 1, tag 2, tag 3
 # order for corners of each tag should be -> BL BR TR TL
-# x, y, z
+# x, y only
 # units should be meters
 tag_corner_coordinates = config["apriltag_corner_local_coordinates"]
 plane_width = 0
 plane_height = 0
 for k, v in tag_corner_coordinates.items():
     m = np.zeros((len(v), 3), dtype=np.float32)
-    # v = np.array(v) * 0.00015240000000000002
-    # v = np.array(v) * 2.54 * 0.01
-    v = np.array(v) * 0.01
+    v = np.array(v) * config["corner_unit_conversion_factor"]
 
     m[:, :2] = v
 
@@ -91,7 +96,8 @@ for k, v in tag_corner_coordinates.items():
     v[:, 0] -= plane_width / 2
     v[:, 1] -= plane_height / 2
 
-    tag_corner_coordinates[k] = v
+    for c in range(len(tag_corner_coordinates[k])):
+        tag_corner_coordinates[k][c] = np.array(config["T_neon_to_mocap"]) @ v[c]
 
 plane_points_3d = np.array(
     [
@@ -102,6 +108,8 @@ plane_points_3d = np.array(
         [-plane_width / 2, plane_height / 2, 0],  # BL
     ]
 )
+for c in range(len(plane_points_3d)):
+    plane_points_3d[c] = np.array(config["T_neon_to_mocap"]) @ plane_points_3d[c]
 
 neon = Neon(recording=neon_rec)
 apriltag_detector = Detector(
@@ -161,6 +169,7 @@ for frame in tqdm(range(int(nframes))):
     # apriltag_pose_in_mocap = neon._convert_to_mocap_format(neon_apriltags.pose)
     neon.set_pose(neon_apriltags.pose.inverse())
 
+
 if "timestamp [ns]" in marker_positions:
     diffs = (marker_positions["timestamp [ns]"] - best_timestamp).abs()
     markers_for_calib = marker_positions.iloc[diffs.idxmin()]
@@ -197,9 +206,10 @@ for id, marker in enumerate(config["neon_marker_labels"]):
     )
 
 mocap_surface.construct_pose(
+    config["ir_marker_radius"],
     orient_towards=np.array(
         [mocap_head.markers[0].Xs, mocap_head.markers[0].Ys, mocap_head.markers[0].Zs]
-    )
+    ),
 )
 
 neon.calculate_pose_in_mocap(mocap_surface.pose)
