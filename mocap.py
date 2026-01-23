@@ -95,7 +95,7 @@ class MocapSurface:
     def add_marker(self, marker):
         self.markers.append(marker)
 
-    def construct_pose(self, orient_towards=None):
+    def construct_pose(self, ir_marker_radius, orient_towards=None):
         """
         Construct the estimated pose of the surface in mocap system.
         """
@@ -145,10 +145,14 @@ class MocapSurface:
             R[:, 0] = self.x_axis
             R[:, 1] = self.y_axis
             R[:, 2] = self.normal
+
+            R[:, 0] /= np.linalg.norm(R[:, 0])
+            R[:, 1] /= np.linalg.norm(R[:, 1])
+            R[:, 2] /= np.linalg.norm(R[:, 2])
         except Exception:
             return False
 
         self.pose = Pose(
-            position=self.centroid.flatten(),
+            position=self.centroid.flatten() - R[:, 2] * ir_marker_radius,
             rotation=R,
         )

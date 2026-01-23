@@ -213,7 +213,6 @@ for frame in tqdm(range(int(nframes))):
     else:
         continue
 
-    # apriltag_pose_in_mocap = neon._convert_to_mocap_format(neon_apriltags.pose)
     neon.set_pose(neon_apriltags.pose.inverse())
 
 
