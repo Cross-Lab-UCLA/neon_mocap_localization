@@ -30,15 +30,19 @@ def align_signals(x, y, y_ts):
     y_norm = normalize(y)
 
     max_corr_idx = np.argmax(np.correlate(y_norm, x_norm, mode="valid"))
-    # max_corr_idx = np.argmax(signal.correlate(x_norm, y_norm, mode="valid"))
-    # lag = max_corr_idx - (len(y) - 1)
 
     x_time_in_y = y_ts[max_corr_idx : (max_corr_idx + len(x))]
     x_idxs_in_y = list(range(max_corr_idx, (max_corr_idx + len(x))))
 
+    return x_time_in_y, x_idxs_in_y, max_corr_idx
+
+
+# parse args
+
 parser = argparse.ArgumentParser(
     description="Determines relative position of Neon scene camera in MoCap coordinate system"
 )
+
 parser.add_argument(
     "-m",
     "--mocap_mat_path",
@@ -55,14 +59,9 @@ parser.add_argument(
     required=True,
 )
 parser.add_argument(
-    "-x", "--xdf_path", help="The XDF file produced by Lab Streaming Layer"
-)
-parser.add_argument(
-    "-n",
-    "--num_neon_markers",
-    help="The number of markers on the wearers head",
-    type=int,
-    default=6,
+    "-x",
+    "--xdf_path",
+    help="The XDF file produced by LabRecorder of Lab Streaming Layer",
 )
 parser.add_argument(
     "-o",
@@ -71,12 +70,21 @@ parser.add_argument(
     default="marker_positions.csv",
 )
 parser.add_argument(
-    "-f",
-    "--reference_marker",
-    help="The label for the reference marker used to do the time alignment",
-    default="NEON_MARKER_1",
+    "-c",
+    "--config_path",
+    help="A config file containing the parameters that remain constant between sessions.",
+    required=True,
 )
-
+parser.add_argument(
+    "-tb",
+    "--trim_begin",
+    help="Trim this many datapoints from the beginning of the MoCap data. Can help with syncing streams.",
+)
+parser.add_argument(
+    "-te",
+    "--trim_end",
+    help="Trim this many datapoints from the end of the MoCap data. Can help with syncing streams.",
+)
 
 args = vars(parser.parse_args())
 
@@ -84,8 +92,6 @@ mocap_mat_path = args["mocap_mat_path"]
 xdf_path = args["xdf_path"]
 neon_rec_path = args["neon_rec_path"]
 c3d_path = args["c3d_path"]
-
-num_neon_markers = args["num_neon_markers"]
 output_path = args["output_path"]
 
 config = []
@@ -216,7 +222,9 @@ marker_positions = marker_positions[:, :, : len(full_time_qtm_in_xdf)]
 
 marker_df = pd.DataFrame()
 marker_df["timestamp [ns]"] = neon_rec.gaze.time
-for marker in config["apriltag_marker_labels"] + config["neon_marker_labels"]:
+# for marker in config["apriltag_marker_labels"] + config["neon_marker_labels"]:
+for marker_name in marker_names:
+    marker = str(marker_name[0])
     index = marker_indices[marker]
 
     marker_pos = marker_positions[index].squeeze()

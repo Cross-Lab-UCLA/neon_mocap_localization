@@ -21,23 +21,39 @@ from plots import (
 )
 from pose import Pose
 
-# from surface import Surface
+from surface import Surface
 
 parser = argparse.ArgumentParser(
     description="Determines relative position of Neon scene camera in MoCap coordinate system"
 )
+
 parser.add_argument(
     "-r",
     "--neon_rec_path",
-    help="The path to the Neon Recording Data",
+    help="The path to the Neon Recording Data (Native and Timeseries accepted)",
     required=True,
 )
 parser.add_argument(
     "-m",
     "--mocap_path",
-    help="The path to the MoCap data (CSV; in Neon timebase)",
+    help="The path to the MoCap data (CSV; in Neon timebase (i.e., synced))",
     required=True,
 )
+parser.add_argument(
+    "-c",
+    "--config_path",
+    help="A config file containing the parameters that remain constant between sessions.",
+    required=True,
+)
+parser.add_argument(
+    "-s",
+    "--surface_gaze_path",
+    help="The path to surface mapped gaze. If an argument is provided, then this method will be prioritized. See the README.md for more info.",
+    default="",
+)
+
+args = vars(parser.parse_args())
+
 # load config
 
 config = []
@@ -67,46 +83,48 @@ marker_positions = pd.read_csv(args["mocap_path"])
 
 # load apriltag corner data (in a user-specified local coordinate system)
 
+plane_width = config["apriltag_pattern_width"]
+plane_height = config["apriltag_pattern_height"]
+
 # tags should be listed in order of increasing ID
 # should be tag 0, tag 1, tag 2, tag 3
 # order for corners of each tag should be -> BL BR TR TL
 # x, y only
 # units should be meters
 tag_corner_coordinates = config["apriltag_corner_local_coordinates"]
-plane_width = 0
-plane_height = 0
-for k, v in tag_corner_coordinates.items():
-    m = np.zeros((len(v), 3), dtype=np.float32)
-    v = np.array(v) * config["corner_unit_conversion_factor"]
+if tag_corner_coordinates:
+    for k, v in tag_corner_coordinates.items():
+        m = np.zeros((len(v), 3), dtype=np.float32)
+        v = np.array(v) * config["corner_unit_conversion_factor"]
 
-    m[:, :2] = v
+        m[:, :2] = v
 
-    tag_corner_coordinates[k] = m
+        tag_corner_coordinates[k] = m
 
-    if np.max(v[:, 0]) > plane_width:
-        plane_width = np.max(v[:, 0])
+        # if np.max(v[:, 0]) > plane_width:
+        # plane_width = np.max(v[:, 0])
 
-    if np.max(v[:, 1]) > plane_height:
-        plane_height = np.max(v[:, 1])
+        # if np.max(v[:, 1]) > plane_height:
+        # plane_height = np.max(v[:, 1])
 
-for k, v in tag_corner_coordinates.items():
-    v[:, 0] -= plane_width / 2
-    v[:, 1] -= plane_height / 2
+    for k, v in tag_corner_coordinates.items():
+        v[:, 0] -= plane_width / 2
+        v[:, 1] -= plane_height / 2
 
-    for c in range(len(tag_corner_coordinates[k])):
-        tag_corner_coordinates[k][c] = np.array(config["T_neon_to_mocap"]) @ v[c]
+        for c in range(len(tag_corner_coordinates[k])):
+            tag_corner_coordinates[k][c] = np.array(config["T_neon_to_mocap"]) @ v[c]
 
-plane_points_3d = np.array(
-    [
-        [-plane_width / 2, plane_height / 2, 0],  # BL
-        [plane_width / 2, plane_height / 2, 0],  # BR
-        [plane_width / 2, -plane_height / 2, 0],  # TR
-        [-plane_width / 2, -plane_height / 2, 0],  # TL
-        [-plane_width / 2, plane_height / 2, 0],  # BL
-    ]
-)
-for c in range(len(plane_points_3d)):
-    plane_points_3d[c] = np.array(config["T_neon_to_mocap"]) @ plane_points_3d[c]
+    plane_points_3d = np.array(
+        [
+            [-plane_width / 2, plane_height / 2, 0],  # BL
+            [plane_width / 2, plane_height / 2, 0],  # BR
+            [plane_width / 2, -plane_height / 2, 0],  # TR
+            [-plane_width / 2, -plane_height / 2, 0],  # TL
+            [-plane_width / 2, plane_height / 2, 0],  # BL
+        ]
+    )
+    for c in range(len(plane_points_3d)):
+        plane_points_3d[c] = np.array(config["T_neon_to_mocap"]) @ plane_points_3d[c]
 
 neon = Neon(recording=neon_rec)
 apriltag_detector = Detector(
@@ -151,8 +169,8 @@ for frame in tqdm(range(int(nframes))):
 
     surface_gaze_image_pts = None
     surface_gaze_object_pts = None
-    if not args["surface_path"] == "":
-        surface_positions = pd.read_csv(args["surface_path"])
+    if not args["surface_gaze_path"] == "":
+        surface_positions = pd.read_csv(args["surface_gaze_path"])
 
         gaze_on_surface_x = (
             surface_positions["gaze position on surface x [normalized]"].to_numpy()
@@ -163,7 +181,12 @@ for frame in tqdm(range(int(nframes))):
             * plane_height
         ) - plane_height / 2
 
-        good_idxs = (gaze_on_surface_x < 1.0) & (gaze_on_surface_x > 0.0)
+        good_idxs = (
+            (gaze_on_surface_x < 1.0)
+            & (gaze_on_surface_x > 0.0)
+            & (gaze_on_surface_y < 1.0)
+            & (gaze_on_surface_y > 0.0)
+        )
         good_gaze_on_surface_x = gaze_on_surface_x[good_idxs]
         good_gaze_on_surface_y = gaze_on_surface_y[good_idxs]
 
@@ -205,12 +228,12 @@ for frame in tqdm(range(int(nframes))):
             best_timestamp = neon_timestamp
             best_frame = frame
             best_plane = neon_apriltags
+
+            neon.set_pose(neon_apriltags.pose.inverse())
         else:
             continue
     else:
         continue
-
-    neon.set_pose(neon_apriltags.pose.inverse())
 
 
 if "timestamp [ns]" in marker_positions:
@@ -223,9 +246,18 @@ else:
 mocap_surface = MocapSurface()
 
 for marker in config["apriltag_marker_labels"]:
-    marker_pos_X = markers_for_calib[f"{marker}_X"].squeeze() / 1000
-    marker_pos_Y = markers_for_calib[f"{marker}_Y"].squeeze() / 1000
-    marker_pos_Z = markers_for_calib[f"{marker}_Z"].squeeze() / 1000
+    marker_pos_X = (
+        markers_for_calib[f"{marker}_X"].squeeze()
+        * config["mocap_unit_conversion_factor"]
+    )
+    marker_pos_Y = (
+        markers_for_calib[f"{marker}_Y"].squeeze()
+        * config["mocap_unit_conversion_factor"]
+    )
+    marker_pos_Z = (
+        markers_for_calib[f"{marker}_Z"].squeeze()
+        * config["mocap_unit_conversion_factor"]
+    )
 
     mocap_surface.add_marker(
         MocapIRMarker(marker_pos_X, marker_pos_Y, marker_pos_Z, marker)
@@ -235,9 +267,18 @@ for marker in config["apriltag_marker_labels"]:
 mocap_head = MocapHead()
 
 for id, marker in enumerate(config["neon_marker_labels"]):
-    marker_pos_X = markers_for_calib[f"{marker}_X"].squeeze() / 1000
-    marker_pos_Y = markers_for_calib[f"{marker}_Y"].squeeze() / 1000
-    marker_pos_Z = markers_for_calib[f"{marker}_Z"].squeeze() / 1000
+    marker_pos_X = (
+        markers_for_calib[f"{marker}_X"].squeeze()
+        * config["mocap_unit_conversion_factor"]
+    )
+    marker_pos_Y = (
+        markers_for_calib[f"{marker}_Y"].squeeze()
+        * config["mocap_unit_conversion_factor"]
+    )
+    marker_pos_Z = (
+        markers_for_calib[f"{marker}_Z"].squeeze()
+        * config["mocap_unit_conversion_factor"]
+    )
 
     mocap_head.add_marker(
         MocapIRMarker(
@@ -382,7 +423,9 @@ for frame in tqdm(range(len(marker_positions))):
     )
 
     gaze_origin_mocap = (
-        neon_camera_position_relative_to_markers * 1000 + avg_neon_marker_position
+        neon_camera_position_relative_to_markers
+        / config["mocap_unit_conversion_factor"]
+        + avg_neon_marker_position
     )
     gaze_origin_Xs[frame] = gaze_origin_mocap[0]
     gaze_origin_Ys[frame] = gaze_origin_mocap[1]

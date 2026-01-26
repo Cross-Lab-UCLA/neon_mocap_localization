@@ -27,7 +27,7 @@ class AprilTags:
         self.surface_gaze_object_pts = surface_gaze_object_pts
         self.surface_gaze_image_pts = surface_gaze_image_pts
 
-        self.good_detection = True
+        self.good_detection = False
         self.error = np.inf
 
         self.pose = None
@@ -94,12 +94,9 @@ class AprilTags:
             self.surface_gaze_image_pts is not None
             and self.surface_gaze_object_pts is not None
         ):
-            object_pts = self.surface_gaze_object_pts
-            image_pts = self.surface_gaze_image_pts
-
             ok, tag_rotation, tag_position, error = cv2.solvePnPGeneric(
-                objectPoints=object_pts,
-                imagePoints=image_pts,
+                objectPoints=self.surface_gaze_object_pts,
+                imagePoints=self.surface_gaze_image_pts,
                 cameraMatrix=self.new_K,
                 distCoeffs=self.D,
                 flags=cv2.SOLVEPNP_IPPE,
@@ -116,6 +113,8 @@ class AprilTags:
         if not ok:
             self.good_detection = False
             return
+        else:
+            self.good_detection = True
 
         tag_rotation, tag_position = cv2.solvePnPRefineVVS(
             object_pts,

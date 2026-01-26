@@ -102,7 +102,6 @@ class MocapSurface:
 
         xs, ys, zs = [], [], []
         if not len(self.apriltags) == 0:
-            apriltag = []
             for apriltag in self.apriltags:
                 for marker in apriltag.markers:
                     xs.append(marker.Xs)
@@ -138,7 +137,7 @@ class MocapSurface:
 
                 ref_vec = orient_towards - self.centroid.squeeze()
 
-                if np.dot(self.normal, ref_vec) < 0:
+                if np.dot(self.normal, ref_vec) > 0:
                     self.normal = -self.normal
 
             R = np.zeros((3, 3))

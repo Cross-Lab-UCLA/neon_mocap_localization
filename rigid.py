@@ -19,12 +19,9 @@ def fit_plane(centers, orient_towards=None):
     if orient_towards is not None:
         orient_towards = np.asarray(orient_towards, dtype=float)
 
-        # if orient_towards.ndim == 1:
-        # orient_towards = orient_towards[:, np.newaxis]
-
         ref_vec = orient_towards - centroid.squeeze()
 
-        if np.dot(normal, ref_vec) > 0:
+        if np.dot(normal, ref_vec) < 0:
             normal = -normal
 
         U[:, 2] = normal
@@ -47,12 +44,9 @@ def fit_plane_simple(centers, orient_towards=None, from_poses=False):
     if orient_towards is not None:
         orient_towards = np.asarray(orient_towards, dtype=float)
 
-        # if orient_towards.ndim == 1:
-        # orient_towards = orient_towards[:, np.newaxis]
-
         ref_vec = orient_towards - centroid.squeeze()
 
-        if np.dot(normal, ref_vec) > 0:
+        if np.dot(normal, ref_vec) < 0:
             normal = -normal
 
     R = np.zeros((3, 3))
