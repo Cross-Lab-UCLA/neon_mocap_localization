@@ -113,20 +113,16 @@ nsamples = marker_positions.shape[2]
 marker_names = data[condition_name][0][0][5][0][0][0][0][0][1][0]
 marker_indices = {str(name[0]): idx for idx, name in enumerate(marker_names)}
 
-# if os.path.exists("tag_name_mapping.json"):
-#     tag_name_mapping = {}
-#     with open("tag_name_mapping.json", "r") as f:
-#         tag_name_mapping = json.load(f)
-#         reverse_tag_name_mapping = {v: k for k, v in tag_name_mapping.items()}
-
 # timesync with neon data
 
 reference_positions = marker_positions[
     marker_indices[args["reference_marker"]]
 ].squeeze()
-trim_begin = 1800
-trim_end = -1800
-reference_positions = reference_positions[:, trim_begin:trim_end]
+
+trim_begin = args["trim_begin"]
+trim_end = -args["trim_end"]
+# reference_positions = reference_positions[:, trim_begin:trim_end]
+
 reference_duration = reference_positions.shape[-1] / 200
 reference_timestamps = np.arange(0, reference_duration, 1 / 200)
 
@@ -147,6 +143,7 @@ for idx, channel in enumerate(
         reference_xdf_data_idx = idx
         break
 
+
 reference_timestamps_xdf = xdf_data[0][qualisys_xdf_idx]["time_stamps"]
 reference_positions_xdf = (
     xdf_data[0][qualisys_xdf_idx]["time_series"][
@@ -158,25 +155,31 @@ reference_positions_xdf = (
 # determine which part of QTM data the LSL recording corresponds
 # to via cross-correlation alignment
 
-time_qtm_in_xdf, idxs_qtm_in_xdf = align_signals(
-    reference_positions[0, :].squeeze(),
+time_qtm_in_xdf, idxs_qtm_in_xdf, qtm_offset = align_signals(
+    reference_positions[0, trim_begin:trim_end].squeeze(),
     reference_positions_xdf[:, 0].squeeze(),
     reference_timestamps_xdf,
 )
 
+qtm_start_in_xdf = qtm_offset - args["trim_begin"]
+qtm_end_in_xdf = qtm_start_in_xdf + len(reference_positions[0, :].squeeze())
+
+full_time_qtm_in_xdf = reference_timestamps_xdf[qtm_start_in_xdf:qtm_end_in_xdf]
+
 plt.plot(reference_timestamps_xdf, reference_positions_xdf[:, 0].squeeze())
 plt.plot(
-    time_qtm_in_xdf,
-    reference_positions[
-        0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
-    ].squeeze(),
+    full_time_qtm_in_xdf,
+    # reference_positions[
+    #     0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
+    # ].squeeze(),
+    reference_positions[0, : len(full_time_qtm_in_xdf)].squeeze(),
 )
 plt.show()
 
 # determine offset between neon and LSL recording via
 # cross-correlation alignment
 
-time_gaze_in_xdf, idxs_gaze_in_xdf = align_signals(
+time_gaze_in_xdf, idxs_gaze_in_xdf, neon_offset = align_signals(
     neon_rec.gaze.data["point_x"],
     xdf_data[0][neon_xdf_idx]["time_series"][:, 0],
     xdf_data[0][neon_xdf_idx]["time_stamps"],
@@ -195,17 +198,19 @@ plt.show()
 time_gaze_in_xdf = time_gaze_in_xdf[: len(neon_rec.gaze.data["point_x"])]
 
 plt.plot(
-    time_qtm_in_xdf,
-    reference_positions[
-        0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
-    ].squeeze(),
+    full_time_qtm_in_xdf,
+    # reference_positions[
+    #     0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
+    # ].squeeze(),
+    reference_positions[0, : len(full_time_qtm_in_xdf)].squeeze(),
 )
 plt.plot(time_gaze_in_xdf, neon_rec.gaze.data["point_x"])
 plt.show()
 
-marker_positions = marker_positions[
-    :, :, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
-]
+# marker_positions = marker_positions[
+#     :, :, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
+# ]
+marker_positions = marker_positions[:, :, : len(full_time_qtm_in_xdf)]
 
 # make dataframe to export as csv
 
@@ -215,24 +220,24 @@ for marker in config["apriltag_marker_labels"] + config["neon_marker_labels"]:
     index = marker_indices[marker]
 
     marker_pos = marker_positions[index].squeeze()
-    marker_pos = marker_pos[:, trim_begin:trim_end]
+    # marker_pos = marker_pos[:, trim_begin:trim_end]
 
     # re-interpolate qtm data to correspond exactly to neon data
 
     fx = interp1d(
-        time_qtm_in_xdf,
+        full_time_qtm_in_xdf,
         marker_pos[0, :],
         bounds_error=False,
         fill_value=np.nan,
     )
     fy = interp1d(
-        time_qtm_in_xdf,
+        full_time_qtm_in_xdf,
         marker_pos[1, :],
         bounds_error=False,
         fill_value=np.nan,
     )
     fz = interp1d(
-        time_qtm_in_xdf,
+        full_time_qtm_in_xdf,
         marker_pos[2, :],
         bounds_error=False,
         fill_value=np.nan,
@@ -336,4 +341,4 @@ c3d_meta_new["camera_masks"] = np.concatenate(
 c3d_data["data"]["meta_points"] = c3d_meta_new
 
 c3d_data.write("mocap_with_gaze.c3d")
-print("Wrote output_with_gaze.c3d")
+print("Wrote mocap_with_gaze.c3d")
