@@ -24,12 +24,6 @@ class Neon:
     def set_pose(self, pose):
         self.pose = pose
 
-    def _convert_to_mocap_format(self, pose, T_neon_to_mocap):
-        return Pose(
-            position=T_neon_to_mocap @ pose.position,
-            rotation=T_neon_to_mocap @ pose.rotation @ np.linalg.inv(T_neon_to_mocap),
-        )
-
     def calculate_pose_in_mocap(
         self,
         surface_pose_mocap,
@@ -37,10 +31,5 @@ class Neon:
     ):
         if self.pose is None:
             raise ValueError("Pose in surface coordinates is not set.")
-
-        # self.pose_in_surface_mocap = self._convert_to_mocap_format(
-        # self.pose, np.array(T_neon_to_mocap)
-        # )
-        # self.pose_in_mocap = surface_pose_mocap.apply(self.pose_in_surface_mocap)
 
         self.pose_in_mocap = surface_pose_mocap.apply(self.pose)
