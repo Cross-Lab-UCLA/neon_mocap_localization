@@ -101,12 +101,6 @@ if tag_corner_coordinates:
 
         tag_corner_coordinates[k] = m
 
-        # if np.max(v[:, 0]) > plane_width:
-        # plane_width = np.max(v[:, 0])
-
-        # if np.max(v[:, 1]) > plane_height:
-        # plane_height = np.max(v[:, 1])
-
     for k, v in tag_corner_coordinates.items():
         v[:, 0] -= plane_width / 2
         v[:, 1] -= plane_height / 2

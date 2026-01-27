@@ -3,12 +3,19 @@ import argparse
 import numpy as np
 import pandas as pd
 from ezc3d import c3d
+import pupil_labs.neon_recording as plnr
 
 
 parser = argparse.ArgumentParser(
     description="Determines relative position of Neon scene camera in MoCap coordinate system"
 )
 
+parser.add_argument(
+    "-n",
+    "--neon_rec_path",
+    help="The folder with the Neon recording data",
+    required=True,
+)
 parser.add_argument(
     "-c", "--c3d_path", help="The path to the Qualisys data (C3D file)", required=True
 )
@@ -21,6 +28,7 @@ parser.add_argument(
 
 args = vars(parser.parse_args())
 
+neon_rec = plnr.open(args["neon_rec_path"])
 c3d_data = c3d(args["c3d_path"])
 
 c3d_frate = c3d_data["header"]["points"]["frame_rate"]
@@ -34,7 +42,9 @@ marker_names = c3d_data["parameters"]["POINT"]["LABELS"]["value"]
 
 output_df = pd.DataFrame({})
 
-output_df["timestamp [ns]"] = np.arange(0, duration_s, step=1.0 / c3d_frate) * 1e-9
+output_df["timestamp [ns]"] = (
+    np.arange(0, duration_s, step=1.0 / c3d_frate) * 1e9 + neon_rec.scene.time[0]
+)
 
 for idx, marker in enumerate(marker_names):
     marker_positions = c3d_points[:, idx, :].squeeze()
