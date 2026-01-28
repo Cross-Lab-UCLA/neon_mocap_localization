@@ -76,12 +76,17 @@ class AprilTags:
         zeroed_D = np.zeros((5, 1), dtype=np.float32)
 
         at_tag_pts = np.zeros((len(self.apriltags_to_use), 4, 2), dtype=np.float32)
+        c = 0
         for detection in self.at_detection:
-            if detection.tag_id in self.apriltags_to_use:
-                at_tag_pts[detection.tag_id] = detection.corners
+            if str(detection.tag_id) in self.apriltags_to_use:
+                # at_tag_pts[str(detection.tag_id)] = detection.corners
+                at_tag_pts[c] = detection.corners
+                c += 1
 
         object_pts = []
-        for k, v in self.tag_corner_coordinates.items():
+        # for k, v in self.tag_corner_coordinates.items():
+        for k in self.apriltags_to_use:
+            v = self.tag_corner_coordinates[k]
             for r in v:
                 object_pts.append(r)
 
