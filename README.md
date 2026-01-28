@@ -1,146 +1,116 @@
-# Localize Neon in Motion Capture Coordinate Systems
+# Neon Localization in MoCap Coordinate Systems
 
-The scripts in this repository calculate the position and orientation (i.e., the pose) of Neon's scene camera 
-in a Motion Capture (MoCap) coordinate system, thereby allowing you to accurately
-represent gaze data in that space.
+This repository provides tools to calculate the position and orientation (**pose**) of the Pupil Labs Neon scene camera within a Motion Capture (MoCap) coordinate system. This allows for high-precision representation of gaze data in 3D space.
 
-The `localize_neon_in_mocap.py` file and associated scripts are meant for the
-[Every move you make](https://pupil-labs.com/products/neon/shop#every-move-you-make)
-and the [I can track clearly now](https://pupil-labs.com/products/neon/shop#i-can-track-clearly-now)
-frames, as well as [any custom frames](https://docs.pupil-labs.com/neon/hardware/make-your-own-frame/)
-that carry Motion Capture markers. You could also attach IR markers to the head of the
-participant or a secure hat/helment that they are wearing.
+It is compatible with [Every Move You Make](https://pupil-labs.com/products/neon/shop#every-move-you-make), [I Can Track Clearly Now](https://pupil-labs.com/products/neon/shop#i-can-track-clearly-now), and [custom frames](https://docs.pupil-labs.com/neon/hardware/make-your-own-frame/) equipped with IR markers. It is also compatible with custom markers placed directly on the head or a well-fitting cap/hat.
 
-Before getting into details, be sure to make a fresh Python virtual environment and
-install the necessary dependencies:
+## ## Setup & Prerequisites
 
-```
+### Environment Setup
+
+Create a fresh Python virtual environment and install the dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-The scripts assume that you have configured your MoCap coordinate system as
-follows:
+### Coordinate System Alignment
 
-- The calibration bar is placed with its arms, flat on the floor or a
-  table surface, as the X and Z axes.
-  - If you are standing with outstretched arms aligned with the X
-    axis, then the X axis points to the right and the Z axis points
-    forwards, away from your body.
-- The Y axis is up, opposite gravity.
+By default, the scripts assume the following MoCap configuration:
 
-If this is not the case, then be sure to modify the
-`T_neon_to_mocap` variable in the `config.json`
-file accordingly. It is a matrix that specifies how to transform from Neon's coordinate system
-conventions to the conventions of your MoCap system. For reference, Neon's scene camera coordinate system follows OpenCV conventions and is diagrammed [here](https://docs.pupil-labs.com/neon/data-collection/data-streams/#_3d-eye-poses).
+* **X & Z Axes:** Calibration bar placed flat on the floor/table.
+* **X-Axis:** Points right (when standing with outstretched arms).
+* **Z-Axis:** Points forward (away from the body).
+* **Y-Axis:** Points up (opposite gravity).
 
-The localization script requires the following two items:
+> [!TIP]
+> If your system uses a different convention, modify the `T_neon_to_mocap` matrix in `config.json`. Neon follows **OpenCV conventions**; see the [Neon 3D eye pose diagram](https://docs.pupil-labs.com/neon/data-collection/data-streams/#_3d-eye-poses) for reference.
 
-1. A Neon Recording that was taken at the same time as the MoCap recording. (Notes about time sync are below.)
-2. A `marker_positions.csv` file, with MoCap data captured during the
-  simultaneous Neon recording, where the wearer is looking at
-  AprilTags on a rigid, flat surface.
-    - The AprilTags _must_ be accompanied by at least four MoCap IR markers that are
-      also positioned on the same flat surface. Ideally, place each
-      marker as precisely as possible on the corner of a black AprilTag corner.
-    - You typically only need four AprilTags, arranged in a square/rectangular pattern.
-    - We recommend using the first four AprilTags [from this document](https://github.com/pupil-labs/pupil-helpers/blob/master/markers_stickersheet/tag36h11_full.pdf?raw=True). Make sure that
-    they are always oriented such that the line of text with the ID is upright.
-    - If you use different AprilTags from the `tag36h11` family, then modify the
-    `apriltags_to_use` entry in the `config.json` file to their IDs.
+---
 
-You can label the Neon and AprilTag IR markers as you wish. Just be sure to add their
-labels to the `neon_marker_labels` and `apriltag_marker_labels` arrays in the
-`config.json` file.
+## ## Making a Recording
 
-In the `config.json` file, you should also enter the following:
+To perform a successful localization, you must capture at least the following two items simultaneously:
 
-- The width of one black edge of a printed AprilTag, in the `apriltag_black_border_width` entry. It
-must be in meters.
-- The radius of your IR markers, in the `ir_marker_radius` entry. It should also be in meters.
+1. **Neon Recording:** A standard recording captured via the Neon Companion app or Pupil Cloud.
+2. **MoCap Data:** A recording containing the trajectory of IR markers on the participant's frame and a flat "AprilTag Board."
 
-The `localize_neon_in_mocap.py` script then offers two methods for localizing Neon in the MoCap space:
+### Hardware Requirements
 
-1. __Using screen-mapped gaze:__ The AprilTags can be used to define a Surface and gaze data can be
-mapped to this Surface. This many 2D-3D correspondences to determine Neon's pose relative
-to your AprilTag board. You can use either the [Marker Mapper](https://docs.pupil-labs.com/neon/pupil-cloud/enrichments/marker-mapper/) of Pupil Cloud or the [Surface Tracker](https://docs.pupil-labs.com/neon/neon-player/surface-tracker/)
-of Neon Player to map gaze to the Surface. Simply instruct your participants to look around the center
-of the board and at each AprilTag while the recording takes place. The resulting CSV file should then be passed
-to the `surface_gaze_path` argument of the `localize_neon_in_mocap.py` script.
-2. __Using local AprilTag corner measurements:__ An alternate way to provide 2D-3D correspondences to
-the algorithm is to measure the positions of the AprilTag corners in the local XY coordinate system of
-the flat AprilTag board. Simply take the top left corner of the top left AprilTag as the origin (i.e.,
-[0, 0]). Then, using a ruler, measure the 15 other corners of the AprilTags relative to it, with X positive to the right
-and Y positive downwards. You can then enter these points into the `apriltag_corner_local_coordinates` entry
-of the `config.json` file. This entry is a JSON map from AprilTag IDs to an array of coordinates for the respective tag's
-4 corners.
-    - It is expected that the coordinates are entered in meters. If not, change the `corner_unit_conversion_factor`
-    accordingly.
-    
-The localization accuracy has been found to be equivalent with both methods, so choose whichever method is
-easiest in your situation.
+* **The Board:** At least four AprilTags (recommended: IDs 0-3 from the `tag36h11` family, as contained [in this document](https://github.com/pupil-labs/pupil-helpers/blob/master/markers_stickersheet/tag36h11_full.pdf?raw=True)) on a rigid, flat surface.
+* **Markers:** Place at least four IR markers precisely on the corners of the AprilTags.
+* **Orientation:** Ensure AprilTags are upright (text ID at the bottom).
 
-Lastly, it is expected that you have properly [time synced](https://docs.pupil-labs.com/neon/data-collection/time-synchronization/) Neon with your MoCap device. It is also easiest to start the Neon recording first,
-then the MoCap recording second. At the end, stop the MoCap recording **first** and the Neon recording **last**.
-The scripts are essentially written with this assumption in mind.
+If you use different AprilTags from the `tag36h11` family, then modify the `apriltags_to_use` entry in the `config.json` file to contain their IDs.
 
-Note that if you are using a Qualisys system, then you need to follow additional steps for time sync:
+---
 
-- You need to make a [Lab Streaming Layer](https://labstreaminglayer.org/) recording, in addition
-  to the standard MoCap and Neon recordings.
-  - Once LSL is installed, start LabRecorder first and instruct it to
-    collect data from [Neon's LSL Gaze Stream](https://docs.pupil-labs.com/neon/data-collection/lab-streaming-layer/),
-    as well as [Qualisys's MoCap LSL streams](https://github.com/qualisys/qualisys_lsl_app). Thereafter, start a Neon
-    recording and then start the MoCap recording last. At the end, stop the MoCap recording first, then the Neon recording,
-    and lastly the LSL recording.
-- Update the `qualisys_reference_marker` entry in the `config.json` file to the label
-of a clearly detected marker in the MoCap recording. This will be used as a reference
-point for time sync.
-- Then, run `convert_qualisys_to_csv.py`, providing also the XDF file
-  that was produced by LSL to the `xdf_path` argument. Use the `-h` flag to see all the required arguments and their descriptions.
-  
-Using LSL to sync data from an Optitrack system to Neon is also recommended. The provided
-`convert_optitrack_to_csv.py` script assumes you have used LSL to record Neon's Gaze and Event
-channels, as well as the start/stop Events sent by the Motive software. Similarly, use the `-h` flag to see all the required arguments and their descriptions.
+## ## Time Synchronization
 
-These time sync scripts should be run *before* the `localize_neon_in_mocap.py` script.
+Proper time sync is critical. General rule: **Start Neon recording first, then MoCap. Stop MoCap first, then Neon last.**
 
-Finally, to run the localization script, do:
+If you use the [Lab Streaming Layer](https://labstreaminglayer.org/), then make sure that a recording is started in LabRecorder before Neon and the MoCap are started, and LabRecorder is the last to be stopped.
 
-```
-python localize_neon_in_mocap.py -r [folder with Neon Native Recording Data] -m [CSV file with time synced MoCap data] -c config.json
+### Vicon
+
+* Ensure Vicon and Neon are synced via standard [Pupil Labs Time Sync](https://docs.pupil-labs.com/neon/data-collection/time-synchronization/) protocols.
+
+### Qualisys
+
+1. Use the Lab Streaming Layer (LSL).
+2. Start **LabRecorder** first, capturing [Neon's LSL Gaze Stream](https://docs.pupil-labs.com/neon/data-collection/lab-streaming-layer/) and [Qualisys LSL streams](https://github.com/qualisys/qualisys_lsl_app).
+3. Run the conversion script before localization:
+```bash
+python convert_qualisys_to_csv.py -x [path_to_xdf] -h
 ```
 
-It will save a "Neon & Mocap calibration file" in
-`neon_camera_pose_relative_to_markers.json`. It will also print out
-some diagnostic data and display some plots. Simply close each plot to
-continue to the next step until completion.
+### Optitrack
 
-After you have run the localization script, you can also make use of
-the provided `gaze_to_mocap` function in your own analysis pipelines, as follows:
-
-```python
-from pose import Pose
-from map_gaze_to_mocap import map_gaze_to_mocap
-
-mocap_transform = []
-with open("neon_camera_pose_relative_to_markers.json", "r") as f:
-    mocap_transform = json.load(f)
-    neon_relative_pose = Pose(
-        position=mocap_transform["position"],
-        rotation=mocap_transform["rotation"],
-    )
-
-map_gaze_to_mocap(
-    neon_relative_pose,
-    azimuth,
-    elevation,
-    avg_neon_marker_positions,
-)
+1. Record Neon Gaze/Events and Motive start/stop events via LSL.
+2. Run the conversion script:
+```bash
+python convert_optitrack_to_csv.py -h
 ```
 
-Azimuth & elevation are provided for each Neon gaze datum in
-[`gaze.csv`](https://docs.pupil-labs.com/neon/data-collection/data-format/#gaze-csv).
+---
 
-The value, `avg_neon_marker_positions`, needs to be calculated for
-each frame of a MoCap recording. It would be advised to interpolate
-either the MoCap data or the Neon data to be at the same sampling rate, after time sync.
+## ## Configuration (`config.json`)
+
+The `config.json` file controls the localization parameters.
+
+| Key | Type | Description |
+| --- | --- | --- |
+| `apriltags_to_use` | Array | List of AprilTag IDs used on your board (e.g., `[0, 1, 2, 3]`). |
+| `neon_marker_labels` | Array | The labels assigned to IR markers on the Neon headset in your MoCap software. |
+| `apriltag_marker_labels` | Array | The labels assigned to IR markers on the AprilTag board. |
+| `apriltag_black_border_width` | Float | The width of one black edge of a printed AprilTag (in **meters**). |
+| `ir_marker_radius` | Float | The radius of your physical IR markers (in **meters**). |
+| `T_neon_to_mocap` | Matrix | Transformation matrix to align Neon's coordinate system with your MoCap. |
+| `qualisys_reference_marker` | String | A clearly detected marker label used for Qualisys LSL time sync. |
+| `apriltag_corner_local_coords` | Object | Local (X,Y) coordinates of the 16 AprilTag corners (in meters). |
+| `corner_unit_conversion` | Float | Multiplier if your local coordinates are not in meters (default: `1.0`). |
+
+---
+
+## ## Localization Workflow
+
+Run the main script to generate the pose file:
+
+```bash
+python localize_neon_in_mocap.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json
+```
+
+### Methods for 2D-3D Correspondence
+
+The script supports two methods for determining pose:
+
+1. **Screen-Mapped Gaze:** Simply instruct your participants to look around the center of the board and at each AprilTag while the recording takes place. Then, map gaze to a "Surface" in [Pupil Cloud](https://docs.pupil-labs.com/neon/pupil-cloud/enrichments/marker-mapper/) or [Neon Player](https://docs.pupil-labs.com/neon/neon-player/surface-tracker/). Pass the resulting CSV to `--surface_gaze_path`.
+2. **Local Corner Measurements:** Manually measure the 16 corners of your 4 AprilTags. The origin (0,0) is the Top-Left of the Top-Left tag, with X positive to the right and Y positive down. List corners as: **Bottom Left, Bottom Right, Top Right, Top Left.**
+
+---
+
+## ## Troubleshooting
+
+* **Plots not appearing:** The script displays diagnostic plots. You must close the current plot window for the script to proceed to the next calculation step.
+* **Time Sync Drift:** Ensure you are using the conversion scripts (`convert_qualisys_to_csv.py` etc.) *before* running the localization script.
+* **Inverted Axes:** If the gaze appears mirrored, double-check your `T_neon_to_mocap` matrix and OpenCV coordinate conventions.
