@@ -4,7 +4,7 @@ This repository provides tools to calculate the position and orientation (**pose
 
 It is compatible with [Every Move You Make](https://pupil-labs.com/products/neon/shop#every-move-you-make), [I Can Track Clearly Now](https://pupil-labs.com/products/neon/shop#i-can-track-clearly-now), and [custom frames](https://docs.pupil-labs.com/neon/hardware/make-your-own-frame/) equipped with IR markers. It is also compatible with custom markers placed directly on the head or a well-fitting cap/hat.
 
-## ## Setup & Prerequisites
+## Setup & Prerequisites
 
 ### Environment Setup
 
@@ -28,7 +28,7 @@ By default, the scripts assume the following MoCap configuration:
 
 ---
 
-## ## Making a Recording
+## Making a Recording
 
 To perform a successful localization, you must capture at least the following two items simultaneously:
 
@@ -45,7 +45,7 @@ If you use different AprilTags from the `tag36h11` family, then modify the `apri
 
 ---
 
-## ## Time Synchronization
+## Time Synchronization
 
 Proper time sync is critical. General rule: **Start Neon recording first, then MoCap. Stop MoCap first, then Neon last.**
 
@@ -74,7 +74,7 @@ python convert_optitrack_to_csv.py -h
 
 ---
 
-## ## Configuration (`config.json`)
+## Configuration (`config.json`)
 
 The `config.json` file controls the localization parameters.
 
@@ -92,7 +92,7 @@ The `config.json` file controls the localization parameters.
 
 ---
 
-## ## Localization Workflow
+## Localization Workflow
 
 Run the main script to generate the pose file:
 
@@ -109,7 +109,7 @@ The script supports two methods for determining pose:
 
 ---
 
-## ## Troubleshooting
+## Troubleshooting
 
 * **Plots not appearing:** The script displays diagnostic plots. You must close the current plot window for the script to proceed to the next calculation step.
 * **Time Sync Drift:** Ensure you are using the conversion scripts (`convert_qualisys_to_csv.py` etc.) *before* running the localization script.
