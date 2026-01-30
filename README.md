@@ -95,19 +95,19 @@ pip install -r requirements.txt
 
 Sync and convert the Motion Capture data to the required CSV format before localization. Use 
 
-# For Qualisys
+#### For Qualisys
 
 ```bash
 python convert_qualisys_to_csv.py -x [path_to_xdf] -h
 ```
 
-# For OptiTrack
+#### For OptiTrack
 
 ```bash
 python convert_optitrack_to_csv.py -h
 ```
 
-# For Vicon
+#### For Vicon
 
 ```bash
 python convert_vicon_to_csv.py -h
