@@ -50,7 +50,7 @@ parser.add_argument(
     required=True,
 )
 parser.add_argument(
-    "-c", "--c3d_path", help="The path to the Qualisys data (C3D file)", required=True
+    "-c3", "--c3d_path", help="The path to the Qualisys data (C3D file)", required=True
 )
 parser.add_argument(
     "-r",
@@ -122,11 +122,11 @@ marker_indices = {str(name[0]): idx for idx, name in enumerate(marker_names)}
 # timesync with neon data
 
 reference_positions = marker_positions[
-    marker_indices[args["reference_marker"]]
+    marker_indices[config["qualisys_reference_marker"]]
 ].squeeze()
 
-trim_begin = args["trim_begin"]
-trim_end = -args["trim_end"]
+trim_begin = int(args["trim_begin"])
+trim_end = -int(args["trim_end"])
 # reference_positions = reference_positions[:, trim_begin:trim_end]
 
 reference_duration = reference_positions.shape[-1] / 200
@@ -145,7 +145,7 @@ reference_xdf_data_idx = -1
 for idx, channel in enumerate(
     xdf_data[0][qualisys_xdf_idx]["info"]["desc"][0]["channels"][0]["channel"]
 ):
-    if args["reference_marker"] in channel["label"][0]:
+    if config["qualisys_reference_marker"] in channel["label"][0]:
         reference_xdf_data_idx = idx
         break
 
@@ -167,7 +167,7 @@ time_qtm_in_xdf, idxs_qtm_in_xdf, qtm_offset = align_signals(
     reference_timestamps_xdf,
 )
 
-qtm_start_in_xdf = qtm_offset - args["trim_begin"]
+qtm_start_in_xdf = qtm_offset - int(args["trim_begin"])
 qtm_end_in_xdf = qtm_start_in_xdf + len(reference_positions[0, :].squeeze())
 
 full_time_qtm_in_xdf = reference_timestamps_xdf[qtm_start_in_xdf:qtm_end_in_xdf]
