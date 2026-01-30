@@ -137,7 +137,7 @@ class MocapSurface:
 
                 ref_vec = orient_towards - self.centroid.squeeze()
 
-                if np.dot(self.normal, ref_vec) > 0:
+                if np.dot(self.normal, ref_vec) < 0:
                     self.normal = -self.normal
 
             R = np.zeros((3, 3))
