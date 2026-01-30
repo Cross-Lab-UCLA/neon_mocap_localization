@@ -126,7 +126,7 @@ The `config.json` file controls the localization parameters. Ensure these match 
 | `ir_marker_radius` | Float | The radius of the physical IR markers (in **meters**). |
 | `T_neon_to_mocap` | Matrix | Transformation matrix aligning Neon's coordinate system with the MoCap system. |
 | `qualisys_reference_marker` | String | A clearly detected marker label used for Qualisys LSL time sync. Leave as the empty string, "", if you do not use a Qualisys device. |
-    | `apriltag_corner_local_coords` | Object | If using the `Local Corner Measurement` method (see below), the local (X,Y) coordinates of the 16 AprilTag corners (default is meters, but other units are acceptable, see `corner_unit_conversion`). |
+| `apriltag_corner_local_coords` | Object | If using the `Local Corner Measurement` method (see below), the local (X,Y) coordinates of the 16 AprilTag corners (default is meters, but other units are acceptable, see `corner_unit_conversion`). |
 | `corner_unit_conversion` | Float | Multiplier if your local coordinates are not in meters (default: `1.0`). |
 
 ### 4. Step A: Compute Calibration
