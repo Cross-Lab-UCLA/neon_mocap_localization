@@ -23,16 +23,94 @@ class MocapIRMarker:
 class MocapHead:
     def __init__(self):
         self.markers = []
-        self.poses = []
+        # self.poses = []
+
+        self.origin = None
+        self.x_axis = None
+        self.y_axis = None
+        self.z_axis = None
 
     def add_marker(self, marker):
         self.markers.append(marker)
-        self.poses.append(
-            Pose(
-                position=np.array([marker.Xs, marker.Ys, marker.Zs]),
-                rotation=np.eye(3),
-            )
+        # self.poses.append(
+        # Pose(
+        # position=np.array([marker.Xs, marker.Ys, marker.Zs]),
+        # rotation=np.eye(3),
+        # )
+        # )
+
+    def get_local_coord_sys(self):
+        # determine position of neon camera relative to frame markers
+        neon_marker_positions_in_mocap = np.array(
+            [[ir_marker.Xs, ir_marker.Ys, ir_marker.Zs] for ir_marker in self.markers]
+        ).T
+
+        self.origin = np.nanmean(neon_marker_positions_in_mocap, axis=1)
+
+        self.x_axis = neon_marker_positions_in_mocap[:, 0] - self.origin
+        self.y_axis = neon_marker_positions_in_mocap[:, 1] - self.origin
+        self.z_axis = neon_marker_positions_in_mocap[:, 2] - self.origin
+
+        self.x_axis /= np.linalg.norm(self.x_axis)
+        self.y_axis /= np.linalg.norm(self.y_axis)
+        self.z_axis /= np.linalg.norm(self.z_axis)
+
+        R = np.zeros((3, 3))
+
+        R[:, 0] = self.x_axis
+        R[:, 1] = self.y_axis
+        R[:, 2] = self.z_axis
+
+        self.pose = Pose(
+            position=self.origin,
+            rotation=R,
         )
+
+    def get_relative_pose(self, marker_constellation):
+        reference_neon_marker_positions = np.array(
+            [
+                [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs]
+                for ir_marker in self.markers
+                if not np.isnan(ir_marker.Xs)
+            ]
+        ).T
+
+        new_neon_marker_positions = np.array(
+            [
+                [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs]
+                for ir_marker in marker_constellation
+                if not np.isnan(ir_marker.Xs)
+            ]
+        ).T
+
+        if np.isnan(new_neon_marker_positions).all():
+            return None
+
+        # 1. Prepare your points (N, 3) as Open3D PointClouds
+        source_pcd = o3d.geometry.PointCloud()
+        # breakpoint()
+        source_pcd.points = o3d.utility.Vector3dVector(
+            reference_neon_marker_positions.T
+        )
+
+        target_pcd = o3d.geometry.PointCloud()
+        target_pcd.points = o3d.utility.Vector3dVector(new_neon_marker_positions.T)
+
+        # 2. Define correspondences (index-to-index)
+        # If points_A[0] matches points_B[0], the vector is [[0,0], [1,1], ...]
+        corres = o3d.utility.Vector2iVector(
+            np.arange(len(reference_neon_marker_positions.T))
+            .reshape(-1, 1)
+            .repeat(2, axis=1)
+        )
+
+        # 3. Estimate transformation (This is the Kabsch/Procrustes part)
+        estimator = o3d.pipelines.registration.TransformationEstimationPointToPoint()
+        transformation = estimator.compute_transformation(
+            source_pcd, target_pcd, corres
+        )
+
+        return transformation
 
 
 class MocapAprilTag:
@@ -121,10 +199,10 @@ class MocapSurface:
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(poses)
 
-            plane_model, inliers = pcd.segment_plane(
-                distance_threshold=0.1, ransac_n=3, num_iterations=1000
+            _, inliers = pcd.segment_plane(
+                distance_threshold=0.004, ransac_n=3, num_iterations=1000
             )
-            [a, b, c, d] = plane_model
+            # [a, b, c, d] = plane_model
 
             inlier_cloud = np.asarray(pcd.select_by_index(inliers).points)
 
