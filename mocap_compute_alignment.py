@@ -1,5 +1,6 @@
 import argparse
 import json
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,10 +22,8 @@ from plots import (
 )
 from pose import Pose
 
-from surface import Surface
-
 parser = argparse.ArgumentParser(
-    description="Determines relative position of Neon scene camera in MoCap coordinate system"
+    description="Determines trajectory of Neon scene camera in MoCap coordinate system"
 )
 
 parser.add_argument(
@@ -48,8 +47,14 @@ parser.add_argument(
 parser.add_argument(
     "-s",
     "--surface_gaze_path",
-    help="The path to surface mapped gaze. If an argument is provided, then this method will be prioritized. See the README.md for more info.",
+    help="The path to surface mapped gaze (optional). If provided, then this method will be prioritized. See the README.md for more info.",
     default="",
+)
+parser.add_argument(
+    "-x",
+    "--calibration_name",
+    help="The base name of the file with the calibration data (i.e., without the '.pkl' extension)",
+    default="calibration_data",
 )
 
 args = vars(parser.parse_args())
@@ -170,6 +175,7 @@ for frame in tqdm(range(int(nframes))):
             surface_positions["gaze position on surface x [normalized]"].to_numpy()
             * plane_width
         ) - plane_width / 2
+
         gaze_on_surface_y = (
             surface_positions["gaze position on surface y [normalized]"].to_numpy()
             * plane_height
@@ -260,7 +266,7 @@ for marker in config["apriltag_marker_labels"]:
 # extract the marker positions for the head pose into a convenient object
 mocap_head = MocapHead()
 
-for id, marker in enumerate(config["neon_marker_labels"]):
+for marker in config["neon_marker_labels"]:
     marker_pos_X = (
         markers_for_calib[f"{marker}_X"].squeeze()
         * config["mocap_unit_conversion_factor"]
@@ -279,7 +285,7 @@ for id, marker in enumerate(config["neon_marker_labels"]):
             marker_pos_X,
             marker_pos_Y,
             marker_pos_Z,
-            id,
+            marker,
         )
     )
 
@@ -290,19 +296,19 @@ mocap_surface.construct_pose(
     ),
 )
 
-neon.calculate_pose_in_mocap(mocap_surface.pose)
+mocap_head.get_local_coord_sys()
+
+neon.calculate_reference_pose_in_mocap(mocap_surface.pose)
 
 # determine position of neon camera relative to frame markers
 neon_marker_positions_in_mocap = np.array(
     [[ir_marker.Xs, ir_marker.Ys, ir_marker.Zs] for ir_marker in mocap_head.markers]
 ).T
-avg_neon_marker_positions = np.nanmean(neon_marker_positions_in_mocap, axis=1)
 
-print("Avg position of neon markers: ")
-print(avg_neon_marker_positions)
+avg_neon_marker_position = np.nanmean(neon_marker_positions_in_mocap, axis=1)
 
 neon_camera_position_relative_to_markers = (
-    neon.pose_in_mocap.position - avg_neon_marker_positions
+    neon.reference_pose_in_mocap.position - avg_neon_marker_position
 )
 
 print("Neon position relative to markers: ")
@@ -310,7 +316,7 @@ print(neon_camera_position_relative_to_markers)
 
 neon_camera_pose_relative_to_markers = Pose(
     position=neon_camera_position_relative_to_markers,
-    rotation=neon.pose_in_mocap.rotation,
+    rotation=neon.reference_pose_in_mocap.rotation,
 )
 
 # plot tags and surface in neon camera coordinates as sanity check
@@ -323,114 +329,30 @@ plot_neon_in_surface(neon.pose, best_plane, plane_points_3d)
 # as obtained via SVD, as sanity check
 plot_surface_local_coordinate_system_in_mocap(mocap_surface)
 
-cam_z_axis_in_mocap = neon.pose_in_mocap.rotation @ np.array([[0], [0], [1.0]])
-
 # plot the final positions, as sanity check
 plot_neon_in_mocap(
     neon,
     mocap_surface,
     mocap_head,
-    cam_z_axis_in_mocap,
 )
 
 print("\nAbsolute Neon scene camera pose in MoCap coordinates:\n")
-print(neon.pose_in_mocap)
+print(neon.reference_pose_in_mocap)
 
-# invert ("recover") and plot neon scene camera relative to markers, as sanity check
-neon_recovered = Neon(recording=neon_rec)
-neon_recovered.pose_in_mocap = Pose(
-    position=(
-        neon_camera_pose_relative_to_markers.position + avg_neon_marker_positions
-    ),
-    rotation=neon.pose_in_mocap.rotation,
-)
+neon.update_neon_camera_pose(mocap_head.markers, mocap_head)
+
 plot_neon_in_mocap(
-    neon_recovered,
+    neon,
     mocap_surface,
     mocap_head,
-    cam_z_axis_in_mocap,
 )
 
-# Export neon_camera_pose_relative_to_markers to JSON file
-output = {
-    "position": neon_camera_pose_relative_to_markers.position.tolist(),
-    "rotation": neon_camera_pose_relative_to_markers.rotation.tolist(),
-}
-
-with open("neon_camera_pose_relative_to_markers.json", "w") as f:
-    json.dump(output, f, indent=4)
-
-print(
-    "\nExported neon_camera_pose_relative_to_markers to neon_camera_pose_relative_to_markers.json"
-)
-
-# make new columns in marker_positions.csv for:
-# - gaze origin in mocap coord sys at each frame
-# - gaze direction in mocap coord sys at each frame
-
-gaze_origin_Xs = np.zeros(len(marker_positions))
-gaze_origin_Ys = np.zeros(len(marker_positions))
-gaze_origin_Zs = np.zeros(len(marker_positions))
-
-gaze_dir_Xs = np.zeros(len(marker_positions))
-gaze_dir_Ys = np.zeros(len(marker_positions))
-gaze_dir_Zs = np.zeros(len(marker_positions))
-
-for frame in tqdm(range(len(marker_positions))):
-    marker_timestamp = int(marker_positions["timestamp [ns]"].iloc[frame])
-
-    # find the equivalent neon data based on marker timestamp
-    idx = np.searchsorted(neon_rec.gaze.time, marker_timestamp)
-
-    gaze_x = neon_rec.gaze.data["point_x"][idx]
-    gaze_y = neon_rec.gaze.data["point_y"][idx]
-
-    gaze_dir = threed_utils.unproject_points(
-        np.array([gaze_x, gaze_y]),
-        neon_rec.calibration.scene_camera_matrix,
-        neon_rec.calibration.scene_distortion_coefficients,
-        normalize=True,
-    )
-
-    gaze_dir_mocap = (gaze_dir.reshape(3, -1)).squeeze()
-    gaze_dir_mocap = neon_camera_pose_relative_to_markers.rotation @ gaze_dir_mocap
-    gaze_dir_Xs[frame] = gaze_dir_mocap[0]
-    gaze_dir_Ys[frame] = gaze_dir_mocap[1]
-    gaze_dir_Zs[frame] = gaze_dir_mocap[2]
-
-    markers_for_calib = marker_positions.iloc[frame]
-
-    marker_pos_X = []
-    marker_pos_Y = []
-    marker_pos_Z = []
-    for id, marker in enumerate(config["neon_marker_labels"]):
-        marker_pos_X.append(markers_for_calib[f"{marker}_X"].squeeze())
-        marker_pos_Y.append(markers_for_calib[f"{marker}_Y"].squeeze())
-        marker_pos_Z.append(markers_for_calib[f"{marker}_Z"].squeeze())
-
-    avg_neon_marker_position = np.array(
-        [
-            np.nanmean(marker_pos_X),
-            np.nanmean(marker_pos_Y),
-            np.nanmean(marker_pos_Z),
-        ]
-    )
-
-    gaze_origin_mocap = (
-        neon_camera_position_relative_to_markers
-        / config["mocap_unit_conversion_factor"]
-        + avg_neon_marker_position
-    )
-    gaze_origin_Xs[frame] = gaze_origin_mocap[0]
-    gaze_origin_Ys[frame] = gaze_origin_mocap[1]
-    gaze_origin_Zs[frame] = gaze_origin_mocap[2]
-
-marker_positions["gaze_origin_X"] = gaze_origin_Xs
-marker_positions["gaze_origin_Y"] = gaze_origin_Ys
-marker_positions["gaze_origin_Z"] = gaze_origin_Zs
-
-marker_positions["gaze_dir_X"] = gaze_dir_Xs
-marker_positions["gaze_dir_Y"] = gaze_dir_Ys
-marker_positions["gaze_dir_Z"] = gaze_dir_Zs
-
-marker_positions.to_csv("marker_positions_w_gaze.csv")
+# Export calibration data
+with open(args["calibration_name"] + ".pkl", "wb") as file:
+    data = {
+        "neon_camera_pose_relative_to_markers": neon_camera_pose_relative_to_markers,
+        "mocap_head": mocap_head,
+        "neon": neon,
+    }
+    pickle.dump(data, file)
+    print(f"Data has been pickled and saved to {args['calibration_name']}.pkl")
