@@ -4,6 +4,7 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 import pandas as pd
 import pupil_labs.neon_recording as plnr
 import pyxdf
@@ -29,7 +30,14 @@ def align_signals(x, y, y_ts):
     x_norm = normalize(x)
     y_norm = normalize(y)
 
-    max_corr_idx = np.argmax(np.correlate(y_norm, x_norm, mode="valid"))
+    n = len(x)
+
+    windows = sliding_window_view(y, n)
+    sq_diff = np.sum((windows - x) ** 2, axis=1)
+
+    # max_corr_idx = np.argmax(np.correlate(y, x, mode="valid"))
+    max_corr_idx = np.argmin(sq_diff)
+    print(max_corr_idx)
 
     x_time_in_y = y_ts[max_corr_idx : (max_corr_idx + len(x))]
     x_idxs_in_y = list(range(max_corr_idx, (max_corr_idx + len(x))))
@@ -111,12 +119,20 @@ neon_rec = plnr.open(neon_rec_path)
 # extract relevant marker positions from mocap data
 
 condition_name = list(data.keys())[-1]
-marker_positions = data[condition_name][0][0][5][0][0][0][0][0][2]
+try:
+    marker_positions = data[condition_name][0][0][5][0][0][0][0][0][2]
+except:
+    marker_positions = data[condition_name][0][0][6][0][0][0][0][0][2]
+
 nsamples = marker_positions.shape[2]
 
 # Indices of relevant markers in marker_positions array
 
-marker_names = data[condition_name][0][0][5][0][0][0][0][0][1][0]
+try:
+    marker_names = data[condition_name][0][0][5][0][0][0][0][0][1][0]
+except:
+    marker_names = data[condition_name][0][0][6][0][0][0][0][0][1][0]
+
 marker_indices = {str(name[0]): idx for idx, name in enumerate(marker_names)}
 
 # timesync with neon data
@@ -125,9 +141,18 @@ reference_positions = marker_positions[
     marker_indices[config["qualisys_reference_marker"]]
 ].squeeze()
 
-trim_begin = int(args["trim_begin"])
-trim_end = -int(args["trim_end"])
-# reference_positions = reference_positions[:, trim_begin:trim_end]
+if args["trim_begin"]:
+    trim_begin = int(args["trim_begin"])
+else:
+    trim_begin = 0
+
+if args["trim_end"]:
+    trim_end = -int(args["trim_end"])
+else:
+    trim_end = len(reference_positions)
+
+if reference_positions.shape[1] == 4:
+    reference_positions = reference_positions.T
 
 reference_duration = reference_positions.shape[-1] / 200
 reference_timestamps = np.arange(0, reference_duration, 1 / 200)
@@ -167,9 +192,8 @@ time_qtm_in_xdf, idxs_qtm_in_xdf, qtm_offset = align_signals(
     reference_timestamps_xdf,
 )
 
-qtm_start_in_xdf = qtm_offset - int(args["trim_begin"])
+qtm_start_in_xdf = qtm_offset - trim_begin
 qtm_end_in_xdf = qtm_start_in_xdf + len(reference_positions[0, :].squeeze())
-
 full_time_qtm_in_xdf = reference_timestamps_xdf[qtm_start_in_xdf:qtm_end_in_xdf]
 
 plt.plot(reference_timestamps_xdf, reference_positions_xdf[:, 0].squeeze())
@@ -229,6 +253,9 @@ for marker_name in marker_names:
 
     marker_pos = marker_positions[index].squeeze()
     # marker_pos = marker_pos[:, trim_begin:trim_end]
+
+    if marker_pos.shape[1] == 4:
+        marker_pos = marker_pos.T
 
     # re-interpolate qtm data to correspond exactly to neon data
 
