@@ -54,28 +54,6 @@ def plot_apriltags_in_neon(
         normalize=True,
     )
 
-    # ax.quiver(
-    #     *(neon_surface.pose_in_neon.position),
-    #     *(neon_surface.x_axis),
-    #     color="r",
-    #     length=0.305,
-    #     normalize=True,
-    # )
-    # ax.quiver(
-    #     *(neon_surface.pose_in_neon.position),
-    #     *(neon_surface.y_axis),
-    #     color="g",
-    #     length=0.305,
-    #     normalize=True,
-    # )
-    # ax.quiver(
-    #     *(neon_surface.pose_in_neon.position),
-    #     *(neon_surface.normal),
-    #     color="b",
-    #     length=0.305,
-    #     normalize=True,
-    # )
-
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
@@ -94,14 +72,6 @@ def plot_neon_in_surface(
 ):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
-
-    # surface_plane = np.zeros((len(neon_surface.surface_corners) + 1, 3))
-    # for i, s in enumerate(neon_surface.surface_corners):
-    #     surface_plane[i] = (
-    #         neon_pose_in_surface.rotation @ s + neon_pose_in_surface.position
-    #     )
-
-    # surface_plane[-1] = surface_plane[0]  # Close the loop
 
     ax.plot(
         surface_points_3d[:, 0],
@@ -146,7 +116,6 @@ def plot_neon_in_surface(
 
     ax.legend()
     set_axes_equal(ax)
-    # ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
 
@@ -155,7 +124,6 @@ def plot_neon_in_mocap(
     neon,
     mocap_surface,
     mocap_head,
-    cam_z_axis_in_mocap,
 ):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
@@ -216,9 +184,9 @@ def plot_neon_in_mocap(
 
     # Plot estimated scene camera position
     ax.scatter(
-        neon.pose_in_mocap.position[0],
-        neon.pose_in_mocap.position[1],
-        neon.pose_in_mocap.position[2],
+        neon.reference_pose_in_mocap.position[0],
+        neon.reference_pose_in_mocap.position[1],
+        neon.reference_pose_in_mocap.position[2],
         color="b",
         marker="s",
         s=50,
@@ -227,12 +195,12 @@ def plot_neon_in_mocap(
 
     # Plot camera Z axis (forward direction)
     ax.quiver(
-        neon.pose_in_mocap.position[0],
-        neon.pose_in_mocap.position[1],
-        neon.pose_in_mocap.position[2],
-        cam_z_axis_in_mocap[0, 0],
-        cam_z_axis_in_mocap[1, 0],
-        cam_z_axis_in_mocap[2, 0],
+        neon.reference_pose_in_mocap.position[0],
+        neon.reference_pose_in_mocap.position[1],
+        neon.reference_pose_in_mocap.position[2],
+        neon.reference_camera_axis_in_mocap[0],
+        neon.reference_camera_axis_in_mocap[1],
+        neon.reference_camera_axis_in_mocap[2],
         color="r",
         length=0.1,
         normalize=True,
@@ -245,7 +213,6 @@ def plot_neon_in_mocap(
     ax.legend()
     ax.set_title("Neon in MoCap Coordinate System")
     set_axes_equal(ax)
-    # ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
 
@@ -311,6 +278,5 @@ def plot_surface_local_coordinate_system_in_mocap(mocap_surface):
     ax.legend()
     ax.set_title("Local Surface Coordinate System")
     set_axes_equal(ax)
-    # ax.set_box_aspect([1, 1, 0.5])
 
     plt.show()
