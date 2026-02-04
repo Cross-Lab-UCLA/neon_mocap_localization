@@ -2,11 +2,11 @@ import argparse
 
 import numpy as np
 import pandas as pd
-import pyxdf
+import pyxdf  # type: ignore
 
 import pupil_labs.neon_recording as plnr
-from cloud_recording import CloudRecording
-from load_optitrack_data import Take
+from pupil_labs.neon_mocap_localization.cloud_recording import CloudRecording
+from pupil_labs.neon_mocap_localization.load_optitrack_data import Take
 
 parser = argparse.ArgumentParser(
     description="Determines relative position of Neon scene camera in MoCap \
@@ -36,7 +36,7 @@ args = vars(parser.parse_args())
 
 # load data
 
-neon_rec = None
+neon_rec: CloudRecording | plnr.NeonRecording
 is_cloud_rec = False
 try:
     neon_rec = CloudRecording(args["neon_rec_path"])
@@ -117,7 +117,7 @@ output_df = pd.DataFrame({})
 marker_time = opti_data.markers[next(iter(opti_data.markers.keys()))].times
 output_df["timestamp [ns]"] = ((marker_time + opti_in_neon_offset) * 1e9).astype(
     np.int64
-) + neon_rec.info["start_time"]
+) + neon_rec.info["start_time"]  # type: ignore
 
 for marker in opti_data.markers:
     marker_positions = np.array(opti_data.markers[marker].positions)

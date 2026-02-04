@@ -1,19 +1,23 @@
 import cv2
 import numpy as np
-from pose import Pose
+import numpy.typing as npt
+from pupil_apriltags import Detector  # type: ignore
+
+from pupil_labs.neon_mocap_localization.neon import Neon
+from pupil_labs.neon_mocap_localization.pose import Pose
 
 
 class AprilTags:
     def __init__(
         self,
-        detector,
-        neon,
-        tag_size,
-        img,
-        tag_corner_coordinates,
-        apriltags_to_use,
-        surface_gaze_object_pts=None,
-        surface_gaze_image_pts=None,
+        detector: Detector,
+        neon: Neon,
+        tag_size: float,
+        img: npt.NDArray[np.uint8],
+        tag_corner_coordinates: dict[str, npt.NDArray[np.float64]],
+        apriltags_to_use: list[str],
+        surface_gaze_object_pts: npt.NDArray[np.floating] | None = None,
+        surface_gaze_image_pts: npt.NDArray[np.floating] | None = None,
     ):
         self.detector = detector
         self.K = neon.camera_matrix
@@ -28,13 +32,12 @@ class AprilTags:
         self.good_detection = False
         self.error = np.inf
 
-        self.pose = None
-
-        self.undist_frame = None
+        # self.pose = None
+        # self.undist_frame = None
 
         self.detect_tags_and_extract_pose(img)
 
-    def detect_tags_and_extract_pose(self, image):
+    def detect_tags_and_extract_pose(self, image: npt.NDArray[np.uint8]) -> None:
         img_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
         self.new_K, _ = cv2.getOptimalNewCameraMatrix(
@@ -46,10 +49,10 @@ class AprilTags:
 
         # self.undist_frame = cv2.undistort(img_gray, self.K, self.D)
 
-        fx = self.new_K[0, 0]
-        fy = self.new_K[1, 1]
-        cx = self.new_K[0, 2]
-        cy = self.new_K[1, 2]
+        fx: float = self.new_K[0, 0]
+        fy: float = self.new_K[1, 1]
+        cx: float = self.new_K[0, 2]
+        cy: float = self.new_K[1, 2]
 
         # fx = self.K[0, 0]
         # fy = self.K[1, 1]
@@ -61,13 +64,13 @@ class AprilTags:
                 self.undist_frame,
                 estimate_tag_pose=True,
                 tag_size=self.tag_size,
-                camera_params=[fx, fy, cx, cy],
+                camera_params=(fx, fy, cx, cy),
             )
         except Exception:
             self.good_detection = False
             return
 
-        if len(self.at_detection) < len(self.apriltags_to_use):
+        if len(self.at_detection) < len(self.apriltags_to_use):  # type: ignore
             self.good_detection = False
             return
 
@@ -75,7 +78,7 @@ class AprilTags:
 
         at_tag_pts = np.zeros((len(self.apriltags_to_use), 4, 2), dtype=np.float32)
         c = 0
-        for detection in self.at_detection:
+        for detection in self.at_detection:  # type: ignore
             if str(detection.tag_id) in self.apriltags_to_use:
                 # at_tag_pts[str(detection.tag_id)] = detection.corners
                 at_tag_pts[c] = detection.corners
@@ -88,10 +91,10 @@ class AprilTags:
             for r in v:
                 object_pts.append(r)
 
-        object_pts = np.array(object_pts)
+        object_pts_np = np.array(object_pts)
 
         image_pts = at_tag_pts.reshape(-1, 2)
-        object_pts = object_pts.reshape(-1, 3)
+        object_pts_np = object_pts_np.reshape(-1, 3)
 
         if (
             self.surface_gaze_image_pts is not None

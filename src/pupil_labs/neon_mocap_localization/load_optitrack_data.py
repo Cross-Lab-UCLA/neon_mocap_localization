@@ -1,4 +1,5 @@
 # ruff: noqa: B905
+# mypy: ignore-errors
 
 import collections
 
@@ -226,7 +227,7 @@ class Take:
 
         # check for any unexpected types on line 3
         all_types = set(self._raw_types)
-        supported_types = set("Rigid Body", "Rigid Body Marker", "Marker")
+        supported_types = {"Rigid Body", "Rigid Body Marker", "Marker"}
         assert all_types.issubset(supported_types), (
             f"Unsupported object type found in header line 3: {all_types}"
         )

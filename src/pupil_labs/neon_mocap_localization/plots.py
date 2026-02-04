@@ -1,8 +1,16 @@
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
+
+from pupil_labs.neon_mocap_localization.apriltags import AprilTags
+from pupil_labs.neon_mocap_localization.mocap import MocapHead, MocapSurface
+from pupil_labs.neon_mocap_localization.neon import Neon
+from pupil_labs.neon_mocap_localization.pose import Pose
 
 
-def set_axes_equal(ax):
+def set_axes_equal(ax: Any) -> None:
     """Make axes of 3D plot have equal scale."""
     limits = np.array([
         ax.get_xlim3d(),
@@ -17,9 +25,9 @@ def set_axes_equal(ax):
 
 
 def plot_apriltags_in_neon(
-    apriltags,
-    tag_plane,
-):
+    apriltags: AprilTags,
+    tag_plane: npt.NDArray[np.float64],
+) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
@@ -64,10 +72,10 @@ def plot_apriltags_in_neon(
 
 
 def plot_neon_in_surface(
-    neon_pose_in_surface,
-    best_plane,
-    surface_points_3d,
-):
+    neon_pose_in_surface: Pose,
+    best_plane: AprilTags,
+    surface_points_3d: npt.NDArray[np.float64],
+) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
@@ -121,15 +129,14 @@ def plot_neon_in_surface(
 
 
 def plot_neon_in_mocap(
-    neon,
-    mocap_surface,
-    mocap_head,
-):
+    neon: Neon,
+    mocap_surface: MocapSurface,
+    mocap_head: MocapHead,
+) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
     if len(mocap_surface.apriltags):
-        cols = ["r", "g", "b", "k"]
         for ac, apriltag in enumerate(mocap_surface.apriltags):
             for mc, marker in enumerate(apriltag.markers):
                 if ac == 0 and mc == 0:
@@ -137,7 +144,7 @@ def plot_neon_in_mocap(
                         marker.Xs,
                         marker.Ys,
                         marker.Zs,
-                        cols[marker.id] + "o",
+                        "ko",
                         label="Tag Markers",
                     )
                 else:
@@ -145,7 +152,7 @@ def plot_neon_in_mocap(
                         marker.Xs,
                         marker.Ys,
                         marker.Zs,
-                        cols[marker.id] + "o",
+                        "ko",
                     )
     else:
         for mc, marker in enumerate(mocap_surface.markers):
@@ -217,7 +224,7 @@ def plot_neon_in_mocap(
     plt.show()
 
 
-def plot_surface_local_coordinate_system_in_mocap(mocap_surface):
+def plot_surface_local_coordinate_system_in_mocap(mocap_surface: MocapSurface) -> None:
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 

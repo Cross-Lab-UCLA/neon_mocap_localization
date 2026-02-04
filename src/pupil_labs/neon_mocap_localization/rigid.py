@@ -1,7 +1,11 @@
 import numpy as np
+import numpy.typing as npt
 
 
-def fit_plane(centers, orient_towards=None):
+def fit_plane(
+    centers: npt.NDArray[np.float64],
+    orient_towards: npt.NDArray[np.float64] | None = None,
+) -> tuple[npt.NDArray[np.float64] | None, npt.NDArray[np.float64] | None]:
     centroid = np.mean(centers, axis=1, keepdims=True)
     centered = centers - centroid
 
@@ -33,7 +37,11 @@ def fit_plane(centers, orient_towards=None):
     return centroid, U
 
 
-def fit_plane_simple(centers, orient_towards=None, from_poses=False):
+def fit_plane_simple(
+    centers: npt.NDArray[np.float64],
+    orient_towards: npt.NDArray[np.float64] | None = None,
+    from_poses: bool = False,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     centroid = np.mean(centers, axis=1, keepdims=True)
     centered = centers - centroid
 
@@ -61,7 +69,9 @@ def fit_plane_simple(centers, orient_towards=None, from_poses=False):
     return centroid, R
 
 
-def get_plane_coordinate_system(inlier_points):
+def get_plane_coordinate_system(
+    inlier_points: npt.NDArray[np.float64],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     centroid = np.mean(inlier_points, axis=0)
     centered_points = inlier_points - centroid
 

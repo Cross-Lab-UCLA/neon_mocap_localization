@@ -6,10 +6,10 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+import pupil_labs.neon_mocap_localization.threed_utils as threed_utils
 import pupil_labs.neon_recording as plnr
-import threed_utils
-from cloud_recording import CloudRecording
-from mocap import MocapIRMarker
+from pupil_labs.neon_mocap_localization.cloud_recording import CloudRecording
+from pupil_labs.neon_mocap_localization.mocap import MocapIRMarker
 
 parser = argparse.ArgumentParser(
     description="Determines trajectory of Neon scene camera in MoCap coordinate system"
@@ -62,7 +62,7 @@ with open(args["config_path"]) as f:
 
 # open neon recording and initialize neon object
 
-neon_rec = None
+neon_rec: CloudRecording | plnr.NeonRecording
 is_cloud_rec = False
 try:
     neon_rec = CloudRecording(args["neon_rec_path"])
@@ -106,12 +106,15 @@ for frame in tqdm(range(len(marker_positions))):
     gaze_x = neon_rec.gaze.data["point_x"][idx]
     gaze_y = neon_rec.gaze.data["point_y"][idx]
 
-    gaze_dir = threed_utils.unproject_points(
-        np.array([gaze_x, gaze_y]),
-        neon_rec.calibration.scene_camera_matrix,
-        neon_rec.calibration.scene_distortion_coefficients,
-        normalize=True,
-    )
+    if neon_rec.calibration is not None:
+        gaze_dir = threed_utils.unproject_points(
+            np.array([gaze_x, gaze_y]),
+            neon_rec.calibration.scene_camera_matrix,
+            neon_rec.calibration.scene_distortion_coefficients,
+            normalize=True,
+        )
+    else:
+        raise ValueError("Recording has no camera calibration data.")
 
     gaze_dir_mocap = (gaze_dir.reshape(3, -1)).squeeze()
     gaze_dir_mocap = neon_camera_pose_relative_to_markers.rotation @ gaze_dir_mocap

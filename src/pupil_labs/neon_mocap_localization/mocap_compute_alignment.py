@@ -4,21 +4,25 @@ import pickle
 
 import numpy as np
 import pandas as pd
-from pose import Pose
-from pupil_apriltags import Detector
+from pupil_apriltags import Detector  # type: ignore
 from tqdm import tqdm
 
 import pupil_labs.neon_recording as plnr
-from apriltags import AprilTags
-from cloud_recording import CloudRecording
-from mocap import MocapHead, MocapIRMarker, MocapSurface
-from neon import Neon
-from plots import (
+from pupil_labs.neon_mocap_localization.apriltags import AprilTags
+from pupil_labs.neon_mocap_localization.cloud_recording import CloudRecording
+from pupil_labs.neon_mocap_localization.mocap import (
+    MocapHead,
+    MocapIRMarker,
+    MocapSurface,
+)
+from pupil_labs.neon_mocap_localization.neon import Neon
+from pupil_labs.neon_mocap_localization.plots import (
     plot_apriltags_in_neon,
     plot_neon_in_mocap,
     plot_neon_in_surface,
     plot_surface_local_coordinate_system_in_mocap,
 )
+from pupil_labs.neon_mocap_localization.pose import Pose
 
 parser = argparse.ArgumentParser(
     description="Determines trajectory of Neon scene camera in MoCap coordinate system"
@@ -70,11 +74,9 @@ with open(args["config_path"]) as f:
 
 # open neon recording and initialize neon object
 
-neon_rec = None
-is_cloud_rec = False
+neon_rec: CloudRecording | plnr.NeonRecording
 try:
     neon_rec = CloudRecording(args["neon_rec_path"])
-    is_cloud_rec = True
     nframes = neon_rec.scene.nframes
 except Exception:
     try:
@@ -137,27 +139,26 @@ apriltag_detector = Detector(
 
 # first find best apriltag detection
 print("Searching for most accurate localization...")
-best_calib_data = {}
 smallest_error = np.inf
-best_timestamp = 0
+best_timestamp = np.signedinteger(0)
 best_frame = 0
-best_plane = None
+best_plane: AprilTags
 for frame in tqdm(range(int(nframes))):
     neon_timestamp = neon_rec.scene.time[frame]
 
     # find the equivalent marker positions based on neon timestamp
-    if "timestamp [ns]" in marker_positions:
-        diffs = (marker_positions["timestamp [ns]"] - neon_timestamp).abs()
-        markers_for_calib = marker_positions.iloc[diffs.idxmin()]
-    else:
-        markers_for_calib = marker_positions.iloc[len(marker_positions) // 2]
+    diffs = (marker_positions["timestamp [ns]"] - neon_timestamp).abs()  # type: ignore
+    markers_for_calib = marker_positions.iloc[diffs.idxmin()]  # type: ignore
 
-    if f"{config['apriltag_marker_labels'][0]}_X" in markers_for_calib and np.isnan(
-        markers_for_calib[f"{config['apriltag_marker_labels'][0]}_X"].any()
+    if (
+        f"{config['apriltag_marker_labels'][0]}_X" in markers_for_calib.keys()  # noqa: SIM118
+        and np.isnan(
+            markers_for_calib[f"{config['apriltag_marker_labels'][0]}_X"].any()
+        )
     ):
         continue
 
-    if is_cloud_rec:
+    if isinstance(neon_rec, CloudRecording):
         apriltag_img = neon_rec.scene.bgr_at_time(neon_timestamp)
     else:
         apriltag_img = neon_rec.scene.data[frame].bgr
@@ -208,8 +209,12 @@ for frame in tqdm(range(int(nframes))):
         surface_gaze_image_pts = np.zeros(
             (len(good_gaze_on_surface_ts), 2), dtype=np.float32
         )
-        surface_gaze_image_pts[:, 0] = good_gaze_2d.data["point_x"]
-        surface_gaze_image_pts[:, 1] = good_gaze_2d.data["point_y"]
+        if isinstance(good_gaze_2d, dict):
+            surface_gaze_image_pts[:, 0] = good_gaze_2d["point_x"]
+            surface_gaze_image_pts[:, 1] = good_gaze_2d["point_y"]
+        else:
+            surface_gaze_image_pts[:, 0] = good_gaze_2d.data["point_x"]
+            surface_gaze_image_pts[:, 1] = good_gaze_2d.data["point_y"]
 
     neon_apriltags = AprilTags(
         apriltag_detector,
@@ -235,11 +240,8 @@ for frame in tqdm(range(int(nframes))):
         continue
 
 
-if "timestamp [ns]" in marker_positions:
-    diffs = (marker_positions["timestamp [ns]"] - best_timestamp).abs()
-    markers_for_calib = marker_positions.iloc[diffs.idxmin()]
-else:
-    markers_for_calib = marker_positions.iloc[len(marker_positions) // 2]
+diffs = (marker_positions["timestamp [ns]"] - best_timestamp).abs()  # type: ignore
+markers_for_calib = marker_positions.iloc[diffs.idxmin()]  # type: ignore
 
 # holds the mocap surface data for a collection of AprilTags
 mocap_surface = MocapSurface()

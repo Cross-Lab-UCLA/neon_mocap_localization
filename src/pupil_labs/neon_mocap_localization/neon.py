@@ -1,34 +1,40 @@
 import numpy as np
-from pose import Pose
+
+import pupil_labs.neon_recording as plnr
+from pupil_labs.neon_mocap_localization.cloud_recording import CloudRecording
+from pupil_labs.neon_mocap_localization.mocap import MocapHead, MocapIRMarker
+from pupil_labs.neon_mocap_localization.pose import Pose
 
 
 class Neon:
-    def __init__(self, recording=None, K=None, D=None):
-        if recording is None:
-            camera_matrix = K
-            distortion_coefficients = D
-        else:
+    def __init__(
+        self,
+        recording: plnr.NeonRecording | CloudRecording,
+    ):
+        if recording.calibration is not None:
             camera_matrix = recording.calibration.scene_camera_matrix
             distortion_coefficients = (
                 recording.calibration.scene_distortion_coefficients
             )
+        else:
+            raise ValueError("Recording contains no camera calibration data")
 
         self.camera_matrix = camera_matrix
         self.dist_coeffs = distortion_coefficients.flatten()
 
-        self.pose = None
-        self.reference_pose_in_mocap = None
+        # self.pose = None
+        # self.reference_pose_in_mocap = None
         self.transformed_pose_in_mocap = Pose(
             position=np.zeros(1), rotation=np.zeros(1)
         )
 
-    def set_pose(self, pose):
+    def set_pose(self, pose: Pose) -> None:
         self.pose = pose
 
     def calculate_reference_pose_in_mocap(
         self,
-        surface_pose_mocap,
-    ):
+        surface_pose_mocap: Pose,
+    ) -> None:
         if self.pose is None:
             raise ValueError("Pose in surface coordinates is not set.")
 
@@ -42,8 +48,10 @@ class Neon:
         )
 
     def update_neon_camera_pose(
-        self, transformed_head_marker_constellation, mocap_head
-    ):
+        self,
+        transformed_head_marker_constellation: list[MocapIRMarker],
+        mocap_head: MocapHead,
+    ) -> bool:
         transformation = mocap_head.get_relative_pose(
             transformed_head_marker_constellation
         )

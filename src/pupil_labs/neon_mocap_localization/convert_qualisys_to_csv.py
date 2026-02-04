@@ -3,22 +3,27 @@ import json
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
-import pyxdf
+import pyxdf  #  type: ignore
 import scipy.io as sio
-from ezc3d import c3d
+from ezc3d import c3d  #  type: ignore
 from numpy.lib.stride_tricks import sliding_window_view
 from scipy.interpolate import interp1d
 
 import pupil_labs.neon_recording as plnr
-from threed_utils import unproject_points
+from pupil_labs.neon_mocap_localization.threed_utils import unproject_points
 
 
-def normalize(x):
+def normalize(x: float) -> np.floating:
     return (x - np.mean(x)) / np.std(x)
 
 
-def align_signals(x, y, y_ts):
+def align_signals(
+    x: npt.NDArray[np.float64],
+    y: npt.NDArray[np.float64],
+    y_ts: npt.NDArray[np.float64],
+) -> tuple[npt.NDArray[np.float64], list[int], np.signedinteger]:
     if np.isnan(x).any():
         x[np.isnan(x)] = np.nanmean(x)
 
@@ -35,7 +40,6 @@ def align_signals(x, y, y_ts):
 
     # max_corr_idx = np.argmax(np.correlate(y, x, mode="valid"))
     max_corr_idx = np.argmin(sq_diff)
-    print(max_corr_idx)
 
     x_time_in_y = y_ts[max_corr_idx : (max_corr_idx + len(x))]
     x_idxs_in_y = list(range(max_corr_idx, (max_corr_idx + len(x))))
@@ -287,12 +291,15 @@ marker_df.to_csv(output_path)
 
 # re-interpolate neon data to correspond exactly to qtm timestamps
 
-gaze_3d = unproject_points(
-    neon_rec.gaze.data[["point_x", "point_y"]],
-    neon_rec.calibration.scene_camera_matrix,
-    neon_rec.calibration.scene_distortion_coefficients,
-    normalize=True,
-)
+if neon_rec.calibration is not None:
+    gaze_3d = unproject_points(
+        neon_rec.gaze.data[["point_x", "point_y"]],
+        neon_rec.calibration.scene_camera_matrix,
+        neon_rec.calibration.scene_distortion_coefficients,
+        normalize=True,
+    )
+else:
+    raise ValueError("Recording has no camera calibration data.")
 
 f_gaze_x = interp1d(
     time_gaze_in_xdf,

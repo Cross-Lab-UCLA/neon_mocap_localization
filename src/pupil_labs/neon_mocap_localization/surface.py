@@ -1,21 +1,23 @@
 import numpy as np
 
+from pupil_labs.neon_mocap_localization.pose import Pose
+
 
 class Surface:
-    def __init__(self, tag_size):
+    def __init__(self, tag_size: float):
         self.tag_size = tag_size
-        self.pose = None
+        # self.pose = None
 
-        self.surface_corners = []
+        # self.surface_corners = []
         self.local_coords = None
 
         self.pose_in_neon = None
 
-        self.x_axis = None
-        self.y_axis = None
-        self.normal = None
+        # self.x_axis = None
+        # self.y_axis = None
+        # self.normal = None
 
-    def set_pose(self, pose):
+    def set_pose(self, pose: Pose) -> None:
         self.pose = pose
 
         self.x_axis = pose.rotation[:, 0]

@@ -2,7 +2,7 @@ import argparse
 
 import numpy as np
 import pandas as pd
-from ezc3d import c3d
+from ezc3d import c3d  #  type: ignore
 
 import pupil_labs.neon_recording as plnr
 

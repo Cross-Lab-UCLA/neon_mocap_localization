@@ -1,14 +1,15 @@
 import numpy as np
-import open3d as o3d
-from pose import Pose
+import numpy.typing as npt
+import open3d as o3d  # type: ignore
 
-from rigid import get_plane_coordinate_system
+from pupil_labs.neon_mocap_localization.pose import Pose
+from pupil_labs.neon_mocap_localization.rigid import get_plane_coordinate_system
 
 
 class MocapIRMarker:
     """Holds the timeseries of positions of an IR Marker"""
 
-    def __init__(self, Xs, Ys, Zs, marker_id):
+    def __init__(self, Xs: float, Ys: float, Zs: float, marker_id: int | str):
         self.Xs = Xs
         self.Ys = Ys
         self.Zs = Zs
@@ -19,16 +20,16 @@ class MocapIRMarker:
 
 
 class MocapHead:
-    def __init__(self):
-        self.markers = []
+    def __init__(self) -> None:
+        self.markers: list[MocapIRMarker] = []
         # self.poses = []
 
-        self.origin = None
-        self.x_axis = None
-        self.y_axis = None
-        self.z_axis = None
+        # self.origin = None
+        # self.x_axis = None
+        # self.y_axis = None
+        # self.z_axis = None
 
-    def add_marker(self, marker):
+    def add_marker(self, marker: MocapIRMarker) -> None:
         self.markers.append(marker)
         # self.poses.append(
         # Pose(
@@ -37,7 +38,7 @@ class MocapHead:
         # )
         # )
 
-    def get_local_coord_sys(self):
+    def get_local_coord_sys(self) -> None:
         # determine position of neon camera relative to frame markers
         neon_marker_positions_in_mocap = np.array([
             [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs] for ir_marker in self.markers
@@ -64,7 +65,9 @@ class MocapHead:
             rotation=R,
         )
 
-    def get_relative_pose(self, marker_constellation):
+    def get_relative_pose(
+        self, marker_constellation: list[MocapIRMarker]
+    ) -> npt.NDArray[np.float64] | None:
         reference_neon_marker_positions = np.array([
             [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs]
             for ir_marker in self.markers
@@ -100,7 +103,7 @@ class MocapHead:
 
         # 3. Estimate transformation (This is the Kabsch/Procrustes part)
         estimator = o3d.pipelines.registration.TransformationEstimationPointToPoint()
-        transformation = estimator.compute_transformation(
+        transformation: npt.NDArray[np.float64] = estimator.compute_transformation(
             source_pcd, target_pcd, corres
         )
 
@@ -108,15 +111,15 @@ class MocapHead:
 
 
 class MocapAprilTag:
-    def __init__(self, tag_id):
-        self.markers = []
+    def __init__(self, tag_id: str):
+        self.markers: list[MocapIRMarker] = []
         self.center = np.array([0, 0, 0])
         self.tag_id = tag_id
 
-    def add_marker(self, marker):
+    def add_marker(self, marker: MocapIRMarker) -> None:
         self.markers.append(marker)
 
-    def estimate_tag_center(self):
+    def estimate_tag_center(self) -> None:
         pos = np.array([
             [marker.Xs for marker in self.markers],
             [marker.Ys for marker in self.markers],
@@ -124,7 +127,7 @@ class MocapAprilTag:
         ])
         self.center = np.mean(pos, axis=1)
 
-    def estimate_size(self):
+    def estimate_size(self) -> None:
         """Estimate tag size [m] from mocap data."""
         tag_marker1_pos = np.array([
             self.markers[0].Xs,
@@ -148,17 +151,21 @@ class MocapAprilTag:
 
 
 class MocapSurface:
-    def __init__(self):
-        self.apriltags = []
-        self.markers = []
+    def __init__(self) -> None:
+        self.apriltags: list[MocapAprilTag] = []
+        self.markers: list[MocapIRMarker] = []
 
-    def add_apriltag(self, apriltag):
+    def add_apriltag(self, apriltag: MocapAprilTag) -> None:
         self.apriltags.append(apriltag)
 
-    def add_marker(self, marker):
+    def add_marker(self, marker: MocapIRMarker) -> None:
         self.markers.append(marker)
 
-    def construct_pose(self, ir_marker_radius, orient_towards=None):
+    def construct_pose(
+        self,
+        ir_marker_radius: float,
+        orient_towards: npt.NDArray[np.float64] | None = None,
+    ) -> bool:
         """Construct the estimated pose of the surface in mocap system."""
         xs, ys, zs = [], [], []
         if len(self.apriltags) != 0:
@@ -215,3 +222,5 @@ class MocapSurface:
             position=self.centroid.flatten() - R[:, 2] * ir_marker_radius,
             rotation=R,
         )
+
+        return True

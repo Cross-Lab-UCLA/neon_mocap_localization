@@ -1,8 +1,14 @@
 import cv2
 import numpy as np
+import numpy.typing as npt
 
 
-def unproject_points(points_2d, camera_matrix, distortion_coefs, normalize=False):
+def unproject_points(
+    points_2d: npt.NDArray[np.float64],
+    camera_matrix: npt.NDArray[np.float64],
+    distortion_coefs: npt.NDArray[np.float64],
+    normalize: bool = False,
+) -> npt.NDArray:
     """Undistorts points according to the camera model.
 
     :param pts_2d, shape: Nx2
@@ -24,6 +30,6 @@ def unproject_points(points_2d, camera_matrix, distortion_coefs, normalize=False
 
     if normalize:
         # normalize vector length to 1
-        points_3d /= np.linalg.norm(points_3d, axis=1)[:, np.newaxis]
+        points_3d /= np.linalg.norm(points_3d, axis=1)[:, np.newaxis]  # type: ignore
 
     return points_3d
