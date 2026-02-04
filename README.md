@@ -6,7 +6,7 @@ By combining these data streams during post-processing, users can generate 3D ga
 
 **Compatibility:**
 
-- **Frames:** *Every Move You Make*, *I Can Track Clearly Now*, and custom frames with IR markers.
+- **Frames:** _Every Move You Make_, _I Can Track Clearly Now_, and custom frames with IR markers.
 - **Headwear:** Custom markers placed directly on the head, or on a well-fitting cap/hat.
 
 ---
@@ -35,9 +35,9 @@ To perform localization, the following elements must be present in the MoCap vol
 
 - **The Wearer:** The participant wearing the Neon frame with attached IR reflective markers.
 - **Calibration Board:** A rigid, flat board containing:
-    - A minimum of **four AprilTags** (Tag36h11 family; IDs 0-3 are recommended).
-    - **IR Markers** placed precisely at the corners of the AprilTags.
-    - **Orientation:** AprilTags must be upright (ID text at the bottom).
+  - A minimum of **four AprilTags** (Tag36h11 family; IDs 0-3 are recommended).
+  - **IR Markers** placed precisely at the corners of the AprilTags.
+  - **Orientation:** AprilTags must be upright (ID text at the bottom).
 
 ### 2. Coordinate System Alignment
 
@@ -89,11 +89,11 @@ Create a Python virtual environment and install the required dependencies:
 
 ```bash
 pip install -r requirements.txt
-````
+```
 
 ### 2. Data Preparation
 
-Sync and convert the Motion Capture data to the required CSV format before localization. Use 
+Sync and convert the Motion Capture data to the required CSV format before localization. Use
 
 #### For Qualisys
 
@@ -117,17 +117,17 @@ python convert_vicon_to_csv.py -h
 
 The `config.json` file controls the localization parameters. Ensure these match the physical setup.
 
-| Key | Type | Description |
-| --- | --- | --- |
-| `apriltags_to_use` | Array | List of AprilTag IDs used on your board (e.g., `[0, 1, 2, 3]`). |
-| `neon_marker_labels` | Array | Labels assigned to the headset markers in the MoCap software. |
-| `apriltag_marker_labels` | Array | Labels assigned to the calibration board markers. |
-| `apriltag_black_border_width` | Float | The width of one black edge of a printed AprilTag (in **meters**). |
-| `ir_marker_radius` | Float | The radius of the physical IR markers (in **meters**). |
-| `T_neon_to_mocap` | Matrix | Transformation matrix aligning Neon's coordinate system with the MoCap system. |
-| `qualisys_reference_marker` | String | A clearly detected marker label used for Qualisys LSL time sync. Leave as the empty string, "", if you do not use a Qualisys device. |
+| Key                            | Type   | Description                                                                                                                                                                                           |
+| ------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apriltags_to_use`             | Array  | List of AprilTag IDs used on your board (e.g., `[0, 1, 2, 3]`).                                                                                                                                       |
+| `neon_marker_labels`           | Array  | Labels assigned to the headset markers in the MoCap software.                                                                                                                                         |
+| `apriltag_marker_labels`       | Array  | Labels assigned to the calibration board markers.                                                                                                                                                     |
+| `apriltag_black_border_width`  | Float  | The width of one black edge of a printed AprilTag (in **meters**).                                                                                                                                    |
+| `ir_marker_radius`             | Float  | The radius of the physical IR markers (in **meters**).                                                                                                                                                |
+| `T_neon_to_mocap`              | Matrix | Transformation matrix aligning Neon's coordinate system with the MoCap system.                                                                                                                        |
+| `qualisys_reference_marker`    | String | A clearly detected marker label used for Qualisys LSL time sync. Leave as the empty string, "", if you do not use a Qualisys device.                                                                  |
 | `apriltag_corner_local_coords` | Object | If using the `Local Corner Measurement` method (see below), the local (X,Y) coordinates of the 16 AprilTag corners (default is meters, but other units are acceptable, see `corner_unit_conversion`). |
-| `corner_unit_conversion` | Float | Multiplier if your local coordinates are not in meters (default: `1.0`). |
+| `corner_unit_conversion`       | Float  | Multiplier if your local coordinates are not in meters (default: `1.0`).                                                                                                                              |
 
 ### 4. Step A: Compute Calibration
 
@@ -159,20 +159,20 @@ python localize_neon_in_mocap.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json
 
 Apply the transformation matrix generated in Step A to the **Experimental Trials**. This generates the final `gaze_in_mocap_space.csv` file.
 
-*(Refer to the script help arguments `python localize_neon_in_mocap.py -h` for instructions on applying a saved transformation to new files).*
+_(Refer to the script help arguments `python localize_neon_in_mocap.py -h` for instructions on applying a saved transformation to new files)._
 
 ---
 
 ## Troubleshooting
 
 - **Plots not appearing:**
-    
-    The script displays diagnostic plots (e.g., time sync offset) during execution. The plot window must be **closed** manually for the script to proceed to the next calculation step.
-    
+
+  The script displays diagnostic plots (e.g., time sync offset) during execution. The plot window must be **closed** manually for the script to proceed to the next calculation step.
+
 - **Time Sync Drift:**
-    
-    If gaze alignment appears to drift over time, verify that the correct conversion script was used in Phase 2, Step 2.
-    
+
+  If gaze alignment appears to drift over time, verify that the correct conversion script was used in Phase 2, Step 2.
+
 - **Inverted Axes:**
-    
-    If gaze appears mirrored, verify the `T_neon_to_mocap` matrix in `config.json` and ensure consistency with OpenCV coordinate conventions.
+
+  If gaze appears mirrored, verify the `T_neon_to_mocap` matrix in `config.json` and ensure consistency with OpenCV coordinate conventions.

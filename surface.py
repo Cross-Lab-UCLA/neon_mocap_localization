@@ -1,8 +1,4 @@
-import cv2
 import numpy as np
-
-from pose import Pose
-from rigid import fit_plane_simple
 
 
 class Surface:

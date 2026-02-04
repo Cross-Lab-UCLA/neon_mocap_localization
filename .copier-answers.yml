@@ -1,0 +1,16 @@
+# Changes here will be overwritten by Copier
+_commit: a8a836f
+_src_path: git@github.com:pupil-labs/pl-template.git
+author_email: info@pupil-labs.com
+author_fullname: Pupil Labs GmbH
+author_username: pupil-labs
+copyright_license: MIT
+debug_module: false
+project_description: A tool to spatio-temporally align Neon's data with MoCap data.
+project_name: Neon MoCap Localization
+publish_to_pypi: false
+python_package_distribution_name: pupil-labs-neon-mocap-localization
+python_package_import_name: neon_mocap_localization
+repository_name: neon-mocap-localization
+repository_namespace: pupil-labs
+repository_provider: github.com

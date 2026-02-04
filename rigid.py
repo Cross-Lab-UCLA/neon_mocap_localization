@@ -69,7 +69,7 @@ def get_plane_coordinate_system(inlier_points):
     # u: Unitary arrays
     # s: Singular values (variance magnitude)
     # vh: Unitary arrays (The rows of vh are the eigenvectors/principal axes)
-    u, s, vh = np.linalg.svd(centered_points)
+    _, _, vh = np.linalg.svd(centered_points)
 
     local_x = vh[0]
     local_y = vh[1]

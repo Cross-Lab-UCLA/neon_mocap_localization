@@ -1,18 +1,16 @@
 import argparse
 import json
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
 import pandas as pd
-import pupil_labs.neon_recording as plnr
 import pyxdf
 import scipy.io as sio
 from ezc3d import c3d
-from scipy import signal
+from numpy.lib.stride_tricks import sliding_window_view
 from scipy.interpolate import interp1d
 
+import pupil_labs.neon_recording as plnr
 from threed_utils import unproject_points
 
 
@@ -27,8 +25,8 @@ def align_signals(x, y, y_ts):
     if np.isnan(y).any():
         y[np.isnan(y)] = np.nanmean(y)
 
-    x_norm = normalize(x)
-    y_norm = normalize(y)
+    # x_norm = normalize(x)
+    # y_norm = normalize(y)
 
     n = len(x)
 
@@ -48,7 +46,8 @@ def align_signals(x, y, y_ts):
 # parse args
 
 parser = argparse.ArgumentParser(
-    description="Determines relative position of Neon scene camera in MoCap coordinate system"
+    description="Determines relative position of Neon scene camera in MoCap \
+coordinate system"
 )
 
 parser.add_argument(
@@ -80,18 +79,21 @@ parser.add_argument(
 parser.add_argument(
     "-c",
     "--config_path",
-    help="A config file containing the parameters that remain constant between sessions.",
+    help="A config file containing the parameters that remain constant between \
+sessions.",
     required=True,
 )
 parser.add_argument(
     "-tb",
     "--trim_begin",
-    help="Trim this many datapoints from the beginning of the MoCap data. Can help with syncing streams.",
+    help="Trim this many datapoints from the beginning of the MoCap data. Can \
+help with syncing streams.",
 )
 parser.add_argument(
     "-te",
     "--trim_end",
-    help="Trim this many datapoints from the end of the MoCap data. Can help with syncing streams.",
+    help="Trim this many datapoints from the end of the MoCap data. Can help \
+with syncing streams.",
 )
 
 args = vars(parser.parse_args())
@@ -103,7 +105,7 @@ c3d_path = args["c3d_path"]
 output_path = args["output_path"]
 
 config = []
-with open(args["config_path"], "r") as f:
+with open(args["config_path"]) as f:
     config = json.load(f)
 
 # load qualisys data
@@ -121,7 +123,7 @@ neon_rec = plnr.open(neon_rec_path)
 condition_name = list(data.keys())[-1]
 try:
     marker_positions = data[condition_name][0][0][5][0][0][0][0][0][2]
-except:
+except Exception:
     marker_positions = data[condition_name][0][0][6][0][0][0][0][0][2]
 
 nsamples = marker_positions.shape[2]
@@ -130,7 +132,7 @@ nsamples = marker_positions.shape[2]
 
 try:
     marker_names = data[condition_name][0][0][5][0][0][0][0][0][1][0]
-except:
+except Exception:
     marker_names = data[condition_name][0][0][6][0][0][0][0][0][1][0]
 
 marker_indices = {str(name[0]): idx for idx, name in enumerate(marker_names)}
@@ -141,15 +143,8 @@ reference_positions = marker_positions[
     marker_indices[config["qualisys_reference_marker"]]
 ].squeeze()
 
-if args["trim_begin"]:
-    trim_begin = int(args["trim_begin"])
-else:
-    trim_begin = 0
-
-if args["trim_end"]:
-    trim_end = -int(args["trim_end"])
-else:
-    trim_end = len(reference_positions)
+trim_begin = int(args["trim_begin"]) if args["trim_begin"] else 0
+trim_end = -int(args["trim_end"]) if args["trim_end"] else len(reference_positions)
 
 if reference_positions.shape[1] == 4:
     reference_positions = reference_positions.T

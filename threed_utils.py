@@ -3,8 +3,8 @@ import numpy as np
 
 
 def unproject_points(points_2d, camera_matrix, distortion_coefs, normalize=False):
-    """
-    Undistorts points according to the camera model.
+    """Undistorts points according to the camera model.
+
     :param pts_2d, shape: Nx2
     :return: Array of unprojected 3d points, shape: Nx3
     """

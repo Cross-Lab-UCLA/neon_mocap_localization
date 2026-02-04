@@ -2,17 +2,16 @@ import argparse
 import json
 import pickle
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pupil_labs.neon_recording as plnr
+from pose import Pose
 from pupil_apriltags import Detector
 from tqdm import tqdm
 
-import threed_utils
+import pupil_labs.neon_recording as plnr
 from apriltags import AprilTags
 from cloud_recording import CloudRecording
-from mocap import MocapAprilTag, MocapHead, MocapIRMarker, MocapSurface
+from mocap import MocapHead, MocapIRMarker, MocapSurface
 from neon import Neon
 from plots import (
     plot_apriltags_in_neon,
@@ -20,7 +19,6 @@ from plots import (
     plot_neon_in_surface,
     plot_surface_local_coordinate_system_in_mocap,
 )
-from pose import Pose
 
 parser = argparse.ArgumentParser(
     description="Determines trajectory of Neon scene camera in MoCap coordinate system"
@@ -41,19 +39,22 @@ parser.add_argument(
 parser.add_argument(
     "-c",
     "--config_path",
-    help="A config file containing the parameters that remain constant between sessions.",
+    help="A config file containing the parameters that remain constant between \
+sessions.",
     required=True,
 )
 parser.add_argument(
     "-s",
     "--surface_gaze_path",
-    help="The path to surface mapped gaze (optional). If provided, then this method will be prioritized. See the README.md for more info.",
+    help="The path to surface mapped gaze (optional). If provided, then this \
+method will be prioritized. See the README.md for more info.",
     default="",
 )
 parser.add_argument(
     "-x",
     "--calibration_name",
-    help="The base name of the file with the calibration data (i.e., without the '.pkl' extension)",
+    help="The base name of the file with the calibration data (i.e., without \
+the '.pkl' extension)",
     default="calibration_data",
 )
 
@@ -62,7 +63,7 @@ args = vars(parser.parse_args())
 # load config
 
 config = []
-with open(args["config_path"], "r") as f:
+with open(args["config_path"]) as f:
     config = json.load(f)
 
 # load data
@@ -79,8 +80,8 @@ except Exception:
     try:
         neon_rec = plnr.open(args["neon_rec_path"])
         nframes = len(neon_rec.scene.data)
-    except Exception:
-        raise ValueError("Not a valid Neon data directory")
+    except Exception as e:
+        raise ValueError("Not a valid Neon data directory") from e
 
 # load mocap data
 
@@ -113,15 +114,13 @@ if tag_corner_coordinates:
         for c in range(len(tag_corner_coordinates[k])):
             tag_corner_coordinates[k][c] = np.array(config["T_neon_to_mocap"]) @ v[c]
 
-    plane_points_3d = np.array(
-        [
-            [-plane_width / 2, plane_height / 2, 0],  # BL
-            [plane_width / 2, plane_height / 2, 0],  # BR
-            [plane_width / 2, -plane_height / 2, 0],  # TR
-            [-plane_width / 2, -plane_height / 2, 0],  # TL
-            [-plane_width / 2, plane_height / 2, 0],  # BL
-        ]
-    )
+    plane_points_3d = np.array([
+        [-plane_width / 2, plane_height / 2, 0],  # BL
+        [plane_width / 2, plane_height / 2, 0],  # BR
+        [plane_width / 2, -plane_height / 2, 0],  # TR
+        [-plane_width / 2, -plane_height / 2, 0],  # TL
+        [-plane_width / 2, plane_height / 2, 0],  # BL
+    ])
     for c in range(len(plane_points_3d)):
         plane_points_3d[c] = np.array(config["T_neon_to_mocap"]) @ plane_points_3d[c]
 
@@ -168,7 +167,7 @@ for frame in tqdm(range(int(nframes))):
 
     surface_gaze_image_pts = None
     surface_gaze_object_pts = None
-    if not args["surface_gaze_path"] == "":
+    if args["surface_gaze_path"] != "":
         surface_positions = pd.read_csv(args["surface_gaze_path"])
 
         gaze_on_surface_x = (
@@ -291,9 +290,11 @@ for marker in config["neon_marker_labels"]:
 
 mocap_surface.construct_pose(
     config["ir_marker_radius"],
-    orient_towards=np.array(
-        [mocap_head.markers[0].Xs, mocap_head.markers[0].Ys, mocap_head.markers[0].Zs]
-    ),
+    orient_towards=np.array([
+        mocap_head.markers[0].Xs,
+        mocap_head.markers[0].Ys,
+        mocap_head.markers[0].Zs,
+    ]),
 )
 
 mocap_head.get_local_coord_sys()
@@ -301,9 +302,9 @@ mocap_head.get_local_coord_sys()
 neon.calculate_reference_pose_in_mocap(mocap_surface.pose)
 
 # determine position of neon camera relative to frame markers
-neon_marker_positions_in_mocap = np.array(
-    [[ir_marker.Xs, ir_marker.Ys, ir_marker.Zs] for ir_marker in mocap_head.markers]
-).T
+neon_marker_positions_in_mocap = np.array([
+    [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs] for ir_marker in mocap_head.markers
+]).T
 
 avg_neon_marker_position = np.nanmean(neon_marker_positions_in_mocap, axis=1)
 

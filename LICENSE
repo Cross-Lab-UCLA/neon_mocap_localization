@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 Robert J. Ennis
+Copyright (c) 2026 Pupil Labs GmbH
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,8 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-The software also includes third-party code under another license:
-
-- Code by Garth Zeglin (2016) in `load_optitrack_data.py` is licensed under the BSD 3-Clause License.
-  See the file and original repository (https://github.com/cmuphyscomp/hmv-s16) for details.

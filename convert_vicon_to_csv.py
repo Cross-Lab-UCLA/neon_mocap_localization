@@ -3,11 +3,12 @@ import argparse
 import numpy as np
 import pandas as pd
 from ezc3d import c3d
+
 import pupil_labs.neon_recording as plnr
 
-
 parser = argparse.ArgumentParser(
-    description="Determines relative position of Neon scene camera in MoCap coordinate system"
+    description="Determines relative position of Neon scene camera in MoCap \
+coordinate system"
 )
 
 parser.add_argument(

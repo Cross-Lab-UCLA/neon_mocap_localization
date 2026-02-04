@@ -1,23 +1,21 @@
 import numpy as np
 import open3d as o3d
-
 from pose import Pose
+
 from rigid import get_plane_coordinate_system
 
 
 class MocapIRMarker:
-    """
-    Holds the timeseries of positions of an IR Marker
-    """
+    """Holds the timeseries of positions of an IR Marker"""
 
-    def __init__(self, Xs, Ys, Zs, id):
+    def __init__(self, Xs, Ys, Zs, marker_id):
         self.Xs = Xs
         self.Ys = Ys
         self.Zs = Zs
 
         self.position = np.array([Xs, Ys, Zs])
 
-        self.id = id
+        self.marker_id = marker_id
 
 
 class MocapHead:
@@ -41,9 +39,9 @@ class MocapHead:
 
     def get_local_coord_sys(self):
         # determine position of neon camera relative to frame markers
-        neon_marker_positions_in_mocap = np.array(
-            [[ir_marker.Xs, ir_marker.Ys, ir_marker.Zs] for ir_marker in self.markers]
-        ).T
+        neon_marker_positions_in_mocap = np.array([
+            [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs] for ir_marker in self.markers
+        ]).T
 
         self.origin = np.nanmean(neon_marker_positions_in_mocap, axis=1)
 
@@ -67,21 +65,17 @@ class MocapHead:
         )
 
     def get_relative_pose(self, marker_constellation):
-        reference_neon_marker_positions = np.array(
-            [
-                [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs]
-                for ir_marker in self.markers
-                if not np.isnan(ir_marker.Xs)
-            ]
-        ).T
+        reference_neon_marker_positions = np.array([
+            [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs]
+            for ir_marker in self.markers
+            if not np.isnan(ir_marker.Xs)
+        ]).T
 
-        new_neon_marker_positions = np.array(
-            [
-                [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs]
-                for ir_marker in marker_constellation
-                if not np.isnan(ir_marker.Xs)
-            ]
-        ).T
+        new_neon_marker_positions = np.array([
+            [ir_marker.Xs, ir_marker.Ys, ir_marker.Zs]
+            for ir_marker in marker_constellation
+            if not np.isnan(ir_marker.Xs)
+        ]).T
 
         if np.isnan(new_neon_marker_positions).all():
             return None
@@ -123,34 +117,25 @@ class MocapAprilTag:
         self.markers.append(marker)
 
     def estimate_tag_center(self):
-        pos = np.array(
-            [
-                [marker.Xs for marker in self.markers],
-                [marker.Ys for marker in self.markers],
-                [marker.Zs for marker in self.markers],
-            ]
-        )
+        pos = np.array([
+            [marker.Xs for marker in self.markers],
+            [marker.Ys for marker in self.markers],
+            [marker.Zs for marker in self.markers],
+        ])
         self.center = np.mean(pos, axis=1)
 
     def estimate_size(self):
-        """
-        Estimate tag size [m] from mocap data.
-        """
-
-        tag_marker1_pos = np.array(
-            [
-                self.markers[0].Xs,
-                self.markers[0].Ys,
-                self.markers[0].Zs,
-            ]
-        )
-        tag_marker2_pos = np.array(
-            [
-                self.markers[1].Xs,
-                self.markers[1].Ys,
-                self.markers[1].Zs,
-            ]
-        )
+        """Estimate tag size [m] from mocap data."""
+        tag_marker1_pos = np.array([
+            self.markers[0].Xs,
+            self.markers[0].Ys,
+            self.markers[0].Zs,
+        ])
+        tag_marker2_pos = np.array([
+            self.markers[1].Xs,
+            self.markers[1].Ys,
+            self.markers[1].Zs,
+        ])
 
         self.tag_size = np.sqrt(
             np.sum(
@@ -174,12 +159,9 @@ class MocapSurface:
         self.markers.append(marker)
 
     def construct_pose(self, ir_marker_radius, orient_towards=None):
-        """
-        Construct the estimated pose of the surface in mocap system.
-        """
-
+        """Construct the estimated pose of the surface in mocap system."""
         xs, ys, zs = [], [], []
-        if not len(self.apriltags) == 0:
+        if len(self.apriltags) != 0:
             for apriltag in self.apriltags:
                 for marker in apriltag.markers:
                     xs.append(marker.Xs)

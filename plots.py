@@ -4,13 +4,11 @@ import numpy as np
 
 def set_axes_equal(ax):
     """Make axes of 3D plot have equal scale."""
-    limits = np.array(
-        [
-            ax.get_xlim3d(),
-            ax.get_ylim3d(),
-            ax.get_zlim3d(),
-        ]
-    )
+    limits = np.array([
+        ax.get_xlim3d(),
+        ax.get_ylim3d(),
+        ax.get_zlim3d(),
+    ])
     origin = np.mean(limits, axis=1)
     radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
     ax.set_xlim3d([origin[0] - radius, origin[0] + radius])
@@ -92,9 +90,11 @@ def plot_neon_in_surface(
         label="Neon Camera Origin",
     )
 
-    cam_z_axis_in_surface = neon_pose_in_surface.rotation @ np.array(
-        [[0], [0], [10.5]]
-    )  # 50cm forward
+    cam_z_axis_in_surface = neon_pose_in_surface.rotation @ np.array([
+        [0],
+        [0],
+        [10.5],
+    ])  # 50cm forward
 
     # Plot camera Z axis (forward direction)
     ax.quiver(

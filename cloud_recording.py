@@ -18,7 +18,7 @@ class Scene:
 
         self.nframes = len(self.time_csv)
 
-        scene_mp4_path = [f for f in self.rec_path.glob("*.mp4")][0]
+        scene_mp4_path = next(iter(self.rec_path.glob("*.mp4")))
 
         self.container = av.open(scene_mp4_path)
         self.video_stream = self.container.streams.video[0]
@@ -68,7 +68,7 @@ class Calibration:
         self.calib_path = rec_path / "scene_camera.json"
 
         scene_calib = []
-        with open(self.calib_path, "r") as f:
+        with open(self.calib_path) as f:
             scene_calib = json.load(f)
 
         self.scene_camera_matrix = np.array(scene_calib["camera_matrix"])
@@ -89,7 +89,7 @@ class CloudRecording:
         self.directory = Path(directory)
 
         self.info = []
-        with open(self.directory / "info.json", "r") as f:
+        with open(self.directory / "info.json") as f:
             self.info = json.load(f)
 
         self.scene = Scene(self.directory)
