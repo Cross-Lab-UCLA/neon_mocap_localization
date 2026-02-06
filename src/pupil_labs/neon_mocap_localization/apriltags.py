@@ -109,7 +109,7 @@ class AprilTags:
             )
         else:
             ok, tag_rotation, tag_position, error = cv2.solvePnPGeneric(
-                objectPoints=object_pts,
+                objectPoints=object_pts_np,
                 imagePoints=image_pts,
                 cameraMatrix=self.new_K,
                 distCoeffs=zeroed_D,
@@ -123,7 +123,7 @@ class AprilTags:
             self.good_detection = True
 
         tag_rotation, tag_position = cv2.solvePnPRefineVVS(
-            object_pts,
+            object_pts_np,
             image_pts,
             self.new_K,
             zeroed_D,

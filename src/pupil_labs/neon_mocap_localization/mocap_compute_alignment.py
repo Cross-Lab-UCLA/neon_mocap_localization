@@ -140,7 +140,7 @@ apriltag_detector = Detector(
 # first find best apriltag detection
 print("Searching for most accurate localization...")
 smallest_error = np.inf
-best_timestamp = np.signedinteger(0)
+best_timestamp = 0
 best_frame = 0
 best_plane: AprilTags
 for frame in tqdm(range(int(nframes))):

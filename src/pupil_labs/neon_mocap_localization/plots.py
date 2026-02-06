@@ -189,6 +189,29 @@ def plot_neon_in_mocap(
                 "rs",
             )
 
+    # plot local coord sys of mocap surface
+    ax.quiver(
+        *mocap_surface.pose.position,
+        *mocap_surface.pose.rotation[:, 0],
+        color="r",
+        length=0.105,
+        normalize=True,
+    )
+    ax.quiver(
+        *mocap_surface.pose.position,
+        *mocap_surface.pose.rotation[:, 1],
+        color="g",
+        length=0.105,
+        normalize=True,
+    )
+    ax.quiver(
+        *mocap_surface.pose.position,
+        *mocap_surface.pose.rotation[:, 2],
+        color="b",
+        length=0.105,
+        normalize=True,
+    )
+
     # Plot estimated scene camera position
     ax.scatter(
         neon.reference_pose_in_mocap.position[0],
