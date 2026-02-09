@@ -44,6 +44,28 @@ def plot_apriltags_in_neon(
         linewidth=2,
     )
 
+    ax.quiver(
+        *apriltags.pose.position,
+        *apriltags.pose.rotation[:, 0],
+        color="r",
+        length=0.105,
+        normalize=True,
+    )
+    ax.quiver(
+        *apriltags.pose.position,
+        *apriltags.pose.rotation[:, 1],
+        color="g",
+        length=0.105,
+        normalize=True,
+    )
+    ax.quiver(
+        *apriltags.pose.position,
+        *apriltags.pose.rotation[:, 2],
+        color="b",
+        length=0.105,
+        normalize=True,
+    )
+
     # Plot camera origin
     ax.scatter(0, 0, 0, color="b", s=50, label="Neon Camera Origin")
 
