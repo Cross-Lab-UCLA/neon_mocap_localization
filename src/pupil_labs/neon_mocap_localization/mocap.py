@@ -224,3 +224,68 @@ class MocapSurface:
         )
 
         return True
+
+    def construct_pose_simple(
+        self,
+        ir_marker_radius: float,
+        orient_towards: npt.NDArray[np.float64] | None = None,
+    ) -> bool:
+        """Construct the estimated pose of the surface in mocap system."""
+        xs, ys, zs = [], [], []
+        if len(self.apriltags) != 0:
+            for apriltag in self.apriltags:
+                for marker in apriltag.markers:
+                    xs.append(marker.Xs)
+                    ys.append(marker.Ys)
+                    zs.append(marker.Zs)
+        else:
+            for marker in self.markers:
+                xs.append(marker.Xs)
+                ys.append(marker.Ys)
+                zs.append(marker.Zs)
+
+        poses = np.vstack([xs, ys, zs]).T
+
+        self.centroid = np.mean(poses, axis=0)
+
+        try:
+            self.x_axis = np.array([
+                self.markers[0].Xs,
+                self.markers[0].Ys,
+                self.markers[0].Zs,
+            ]) - np.array([self.markers[1].Xs, self.markers[1].Ys, self.markers[1].Zs])
+
+            self.y_axis = np.array([
+                self.markers[0].Xs,
+                self.markers[0].Ys,
+                self.markers[0].Zs,
+            ]) - np.array([self.markers[3].Xs, self.markers[3].Ys, self.markers[3].Zs])
+
+            self.x_axis /= np.linalg.norm(self.x_axis)
+            self.y_axis /= np.linalg.norm(self.y_axis)
+
+            self.normal = np.cross(self.x_axis, self.y_axis)
+
+            if orient_towards is not None:
+                orient_towards = np.asarray(orient_towards, dtype=float)
+
+                ref_vec = orient_towards - self.centroid.squeeze()
+
+                if np.dot(self.normal, ref_vec) < 0:
+                    self.normal = -self.normal
+
+            self.normal /= np.linalg.norm(self.normal)
+
+            R = np.zeros((3, 3))
+            R[:, 0] = self.x_axis
+            R[:, 1] = self.y_axis
+            R[:, 2] = self.normal
+        except Exception:
+            return False
+
+        self.pose = Pose(
+            position=self.centroid.flatten() - R[:, 2] * ir_marker_radius,
+            rotation=R,
+        )
+
+        return True
