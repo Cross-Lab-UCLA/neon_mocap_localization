@@ -92,6 +92,12 @@ Create a Python virtual environment and install the required dependencies:
 pip install -r requirements.txt
 ```
 
+Then, install this package into the virtual environment:
+
+```bash
+pip install -e .
+```
+
 ### 2. Data Preparation
 
 Sync and convert the Motion Capture data to the required CSV format before localization. Make sure
