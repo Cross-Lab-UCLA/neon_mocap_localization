@@ -58,15 +58,6 @@ class Neon:
         if transformation is None:
             return False
 
-        # neon_pcd = o3d.geometry.PointCloud()
-        # neon_pcd.points = o3d.utility.Vector3dVector(
-        # self.reference_pose_in_mocap.position.reshape(-1, 3)
-        # )
-
-        # self.transformed_pose_in_mocap.position = np.asarray(
-        #     neon_pcd.transform(transformation).points
-        # ).flatten()
-
         R = transformation[:3, :3]
         t = transformation[:3, 3]
 
