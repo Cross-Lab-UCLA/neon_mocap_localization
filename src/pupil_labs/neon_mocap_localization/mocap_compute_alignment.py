@@ -151,9 +151,9 @@ for frame in tqdm(range(int(nframes))):
     markers_for_calib = marker_positions.iloc[diffs.idxmin()]  # type: ignore
 
     if (
-        f"{config['apriltag_marker_labels'][0]}_X" in markers_for_calib.keys()  # noqa: SIM118
+        f"{config['apriltag_marker_labels']['Top Left']}_X" in markers_for_calib.keys()  # noqa: SIM118
         and np.isnan(
-            markers_for_calib[f"{config['apriltag_marker_labels'][0]}_X"].any()
+            markers_for_calib[f"{config['apriltag_marker_labels']['Top Left']}_X"].any()
         )
     ):
         continue
@@ -246,7 +246,9 @@ markers_for_calib = marker_positions.iloc[diffs.idxmin()]  # type: ignore
 # holds the mocap surface data for a collection of AprilTags
 mocap_surface = MocapSurface()
 
-for marker in config["apriltag_marker_labels"]:
+for marker_id in ["Top Left", "Top Right", "Bottom Right", "Bottom Left"]:
+    marker = config["apriltag_marker_labels"][marker_id]
+
     marker_pos_X = (
         markers_for_calib[f"{marker}_X"].squeeze()
         * config["mocap_unit_conversion_factor"]
@@ -261,7 +263,7 @@ for marker in config["apriltag_marker_labels"]:
     )
 
     mocap_surface.add_marker(
-        MocapIRMarker(marker_pos_X, marker_pos_Y, marker_pos_Z, marker)
+        MocapIRMarker(marker_pos_X, marker_pos_Y, marker_pos_Z, marker_id)
     )
 
 # extract the marker positions for the head pose into a convenient object
@@ -290,7 +292,7 @@ for marker in config["neon_marker_labels"]:
         )
     )
 
-mocap_surface.construct_pose(
+mocap_surface.construct_pose_simple(
     config["ir_marker_radius"],
     orient_towards=np.array([
         mocap_head.markers[0].Xs,
@@ -351,11 +353,11 @@ plot_neon_in_mocap(
 )
 
 # Export calibration data
-with open(args["calibration_name"] + ".pkl", "wb") as file:
+with open(args["calibration_name"], "wb") as file:
     data = {
         "neon_camera_pose_relative_to_markers": neon_camera_pose_relative_to_markers,
         "mocap_head": mocap_head,
         "neon": neon,
     }
     pickle.dump(data, file)
-    print(f"Data has been pickled and saved to {args['calibration_name']}.pkl")
+    print(f"Data has been pickled and saved to {args['calibration_name']}")
