@@ -219,7 +219,7 @@ for frame in tqdm(range(int(nframes))):
     neon_apriltags = AprilTags(
         apriltag_detector,
         neon,
-        config["apriltag_black_border_width"],
+        config["apriltag_black_side_length"],
         apriltag_img,
         tag_corner_coordinates,
         config["apriltags_to_use"],

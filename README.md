@@ -35,8 +35,8 @@ To perform localization, the following elements must be present in the MoCap vol
 
 - **The Wearer:** The participant wearing the Neon frame with attached IR reflective markers.
 - **Calibration Board:** A rigid, flat board containing:
-  - **Four AprilTags** Tag36h11 family; IDs 0-3 are recommended.
-  - **IR Markers** placed precisely at the corners of the AprilTags.
+  - **Four AprilTags** from the Tag36h11 family; IDs 0-3 are recommended.
+  - **Four IR Markers** centered precisely at the corners of the AprilTags.
   - **Orientation:** AprilTags must be upright (ID text at the bottom).
 
 ### 2. Coordinate System Alignment
@@ -100,36 +100,39 @@ to provide the arguments specified in the respective commands help display.
 #### For Qualisys
 
 ```bash
-python convert_qualisys_to_csv.py -h
+python ./commands/convert_qualisys_to_csv.py -h
 ```
 
 #### For OptiTrack
 
 ```bash
-python convert_optitrack_to_csv.py -h
+python ./commands/convert_optitrack_to_csv.py -h
 ```
 
 #### For Vicon
 
 ```bash
-python convert_vicon_to_csv.py -h
+python ./commands/convert_vicon_to_csv.py -h
 ```
 
 ### 3. Configuration (`config.json`)
 
-The `config.json` file controls the localization parameters. Ensure these match the physical setup.
+The `config.json` file controls the localization parameters. Ensure these match the physical setup. See the example in `examples/config.json` for reference.
 
-| Key                            | Type   | Description                                                                                                                                                                                           |
-| ------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apriltags_to_use`             | Array  | List of AprilTag IDs used on your board (e.g., `[0, 1, 2, 3]`).                                                                                                                                       |
-| `neon_marker_labels`           | Array  | Labels assigned to the headset markers in the MoCap software.                                                                                                                                         |
-| `apriltag_marker_labels`       | Array  | Labels assigned to the calibration board markers.                                                                                                                                                     |
-| `apriltag_black_border_width`  | Float  | The width of one black edge of a printed AprilTag (in **meters**).                                                                                                                                    |
-| `ir_marker_radius`             | Float  | The radius of the physical IR markers (in **meters**).                                                                                                                                                |
-| `T_neon_to_mocap`              | Matrix | Transformation matrix aligning Neon's coordinate system with the MoCap system.                                                                                                                        |
-| `qualisys_reference_marker`    | String | A clearly detected marker label used for Qualisys LSL time sync. Leave as the empty string, "", if you do not use a Qualisys device.                                                                  |
-| `apriltag_corner_local_coords` | Object | If using the `Local Corner Measurement` method (see below), the local (X,Y) coordinates of the 16 AprilTag corners (default is meters, but other units are acceptable, see `corner_unit_conversion`). |
-| `corner_unit_conversion`       | Float  | Multiplier if your local coordinates are not in meters (default: `1.0`).                                                                                                                              |
+| Key                            | Type   | Description                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `qualisys_reference_marker`    | String | A clearly detected marker label used for Qualisys LSL time sync. Leave as the empty string, "", if you do not use a Qualisys device.                                                                                                                                                                     |
+| `T_neon_to_mocap`              | Matrix | Transformation matrix aligning Neon's coordinate system with the MoCap system.                                                                                                                                                                                                                           |
+| `apriltag_black_side_length`   | Float  | The length of one black side of a printed AprilTag (in **meters**).                                                                                                                                                                                                                                      |
+| `ir_marker_radius`             | Float  | The radius of the physical IR markers (in **meters**; default: `0.006`).                                                                                                                                                                                                                                 |
+| `apriltag_pattern_width`       | Float  | The distance from the top left corner of the top left AprilTag to the top right corner of the top right AprilTag (in **meters**).                                                                                                                                                                        |
+| `apriltag_pattern_height`      | Float  | The distance from the top left corner of the top left AprilTag to the bottom left corner of the bottom left AprilTag (in **meters**).                                                                                                                                                                    |
+| `mocap_unit_conversion_factor` | Float  | Internally, the scripts expect distances in meters. If your MoCap system does not record in meters, then use this option to scale it appropriately (default: `0.001`).                                                                                                                                   |
+| `neon_marker_labels`           | Array  | A map holding the labels assigned to the headset markers in the MoCap software. The keys of the map must be "Top Left", "Top Right", "Bottom Right", and "Bottom Left".                                                                                                                                  |
+| `apriltag_marker_labels`       | Object | This is a map that holds the labels assigned to the calibration board markers. The keys of                                                                                                                                                                                                               |
+| `apriltags_to_use`             | Array  | List of AprilTag IDs used on your board (e.g., `[0, 1, 2, 3]`).                                                                                                                                                                                                                                          |
+| `corner_unit_conversion`       | Float  | Multiplier if your local coordinates are not in meters (default: `1.0`).                                                                                                                                                                                                                                 |
+| `apriltag_corner_local_coords` | Object | If using the `Local Corner Measurement` method (see below), the local (X,Y) coordinates of the 16 AprilTag corners (default is meters, but other units are acceptable, see `corner_unit_conversion`). The coordinates are saved as array values in a map whose keys are the IDs from `apriltags_to_use`. |
 
 ### 4. Step A: Compute Calibration
 
@@ -143,7 +146,7 @@ There are two methods for establishing the board's position:
 - Pass the resulting CSV to the script.
 
 ```bash
-python mocap_compute_alignment.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json --surface_gaze_path [surface_gaze.csv]
+python ./commands/mocap_compute_alignment.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json --surface_gaze_path [surface_gaze.csv]
 ```
 
 **Method 2: Local Corner Measurements**
@@ -154,7 +157,7 @@ python mocap_compute_alignment.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json
 - **Order:** List corners in `config.json` as: **Bottom Left, Bottom Right, Top Right, Top Left**.
 
 ```bash
-python mocap_compute_alignment.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json
+python ./commands/mocap_compute_alignment.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json
 ```
 
 ### 5. Step B: Apply to Experimental Data
