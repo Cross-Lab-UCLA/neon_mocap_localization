@@ -35,7 +35,7 @@ To perform localization, the following elements must be present in the MoCap vol
 
 - **The Wearer:** The participant wearing the Neon frame with attached IR reflective markers.
 - **Calibration Board:** A rigid, flat board containing:
-  - A minimum of **four AprilTags** (Tag36h11 family; IDs 0-3 are recommended).
+  - **Four AprilTags** Tag36h11 family; IDs 0-3 are recommended.
   - **IR Markers** placed precisely at the corners of the AprilTags.
   - **Orientation:** AprilTags must be upright (ID text at the bottom).
 
@@ -48,7 +48,7 @@ By default, the scripts assume the following MoCap configuration based on a cali
 - **Z-Axis:** Points Forward (away from the body).
 
 > [!TIP]
-> Note: If a different convention is used, the `T_neon_to_mocap` matrix in `config.json` must be modified. Note that Neon follows OpenCV conventions (see the [Neon 3D eye pose diagram](https://docs.pupil-labs.com/neon/data-collection/data-streams/#_3d-eye-poses)).
+> Note: If a different convention is used, the `T_neon_to_mocap` matrix in `config.json` must be modified. It will most likely need to be a [permutation matrix](https://en.wikipedia.org/wiki/Permutation_matrix). Note that Neon follows OpenCV conventions (see the [Neon 3D eye pose diagram](https://docs.pupil-labs.com/neon/data-collection/data-streams/#_3d-eye-poses)).
 
 ### 3. Time Synchronization
 
@@ -66,9 +66,10 @@ Proper time synchronization is critical. Select the method appropriate for the h
 
 A dedicated recording is required to compute the transformation matrix.
 
-1. **Position:** Place the calibration board approximately at arm's length and at head height. The board should be no further than ~0.7m distance from the participant.
-2. **Procedure:** The participant should gaze at the center of the board and at each AprilTag for ~15-20 seconds.
-3. **Visibility:** Ensure the MoCap cameras detect all markers (frame and board) and that the Neon scene camera detects the AprilTags for the duration of the recording.
+1. **Position:** Place the calibration board approximately at arm's length and at head height. The board should be no further than ~0.7m distance from the participant's head, regardless of whether it is sitting at waist height or higher/lower.
+2. **Orientation**: The calibration board must be placed right side up. That is, the ID text of each printed AprilTag should be legibly oriented.
+3. **Procedure:** The participant should gaze at the center of the board and at each AprilTag for ~15-20 seconds, while keeping their head still.
+4. **Visibility:** Ensure the MoCap cameras detect all markers (frame and board) and that the Neon scene camera detects the AprilTags for the duration of the recording.
 
 ### 5. Recording Experimental Trials
 
@@ -93,12 +94,13 @@ pip install -r requirements.txt
 
 ### 2. Data Preparation
 
-Sync and convert the Motion Capture data to the required CSV format before localization. Use
+Sync and convert the Motion Capture data to the required CSV format before localization. Make sure
+to provide the arguments specified in the respective commands help display.
 
 #### For Qualisys
 
 ```bash
-python convert_qualisys_to_csv.py -x [path_to_xdf] -h
+python convert_qualisys_to_csv.py -h
 ```
 
 #### For OptiTrack
@@ -137,11 +139,11 @@ There are two methods for establishing the board's position:
 
 **Method 1: Screen-Mapped Gaze (Recommended)**
 
-- Map gaze to the calibration "Surface" in Pupil Cloud or Neon Player.
+- Map gaze to the calibration "Surface" in [Pupil Cloud](https://docs.pupil-labs.com/neon/pupil-cloud/enrichments/marker-mapper/) or [Neon Player](https://docs.pupil-labs.com/neon/neon-player/surface-tracker/).
 - Pass the resulting CSV to the script.
 
 ```bash
-python localize_neon_in_mocap.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json --surface_gaze_path [surface_gaze.csv]
+python mocap_compute_alignment.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json --surface_gaze_path [surface_gaze.csv]
 ```
 
 **Method 2: Local Corner Measurements**
@@ -152,14 +154,14 @@ python localize_neon_in_mocap.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json 
 - **Order:** List corners in `config.json` as: **Bottom Left, Bottom Right, Top Right, Top Left**.
 
 ```bash
-python localize_neon_in_mocap.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json
+python mocap_compute_alignment.py -r [Neon_Folder] -m [MoCap_CSV] -c config.json
 ```
 
 ### 5. Step B: Apply to Experimental Data
 
-Apply the transformation matrix generated in Step A to the **Experimental Trials**. This generates the final `gaze_in_mocap_space.csv` file.
+Apply the transformation matrix generated in Step A to the **Experimental Trials** with the `apply_alignment.py` script. This generates the final CSV file with gaze data in MoCap space.
 
-_(Refer to the script help arguments `python localize_neon_in_mocap.py -h` for instructions on applying a saved transformation to new files)._
+_(Refer to the script help arguments `python apply_alignment.py -h` for instructions on applying a saved transformation to new files)._
 
 ---
 
@@ -167,7 +169,7 @@ _(Refer to the script help arguments `python localize_neon_in_mocap.py -h` for i
 
 - **Plots not appearing:**
 
-  The script displays diagnostic plots (e.g., time sync offset) during execution. The plot window must be **closed** manually for the script to proceed to the next calculation step.
+  The `mocap_compute_alignment.py` script displays diagnostic plots (e.g., time sync offset) during execution. The plot window must be **closed** manually for the script to proceed to the next calculation step.
 
 - **Time Sync Drift:**
 
