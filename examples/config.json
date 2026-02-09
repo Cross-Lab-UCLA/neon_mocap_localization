@@ -1,0 +1,55 @@
+{
+  "qualisys_reference_marker": "",
+  "T_neon_to_mocap": [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1]
+  ],
+  "apriltag_black_side_length": 0.123,
+  "ir_marker_radius": 0.006,
+  "apriltag_pattern_width": 0.6,
+  "apriltag_pattern_height": 0.45,
+  "mocap_unit_conversion_factor": 0.001,
+  "neon_marker_labels": [
+    "NEON_MAKER_1",
+    "NEON_MAKER_2",
+    "NEON_MAKER_3",
+    "NEON_MAKER_4",
+    "NEON_MAKER_5",
+    "NEON_MAKER_6"
+  ],
+  "apriltag_marker_labels": {
+    "Top Left": "APRILTAG_MARKER_1",
+    "Top Right": "APRILTAG_MARKER_2",
+    "Bottom Right": "APRILTAG_MARKER_3",
+    "Bottom Left": "APRILTAG_MARKER_4"
+  },
+  "apriltags_to_use": ["0", "1", "2", "3"],
+  "corner_unit_conversion_factor": 1.0,
+  "apriltag_corner_local_coordinates": {
+    "0": [
+      [0, 0.123],
+      [0.123, 0.123],
+      [0.123, 0],
+      [0, 0]
+    ],
+    "1": [
+      [0.485, 0.123],
+      [0.608, 0.123],
+      [0.608, 0],
+      [0.485, 0]
+    ],
+    "2": [
+      [0.485, 0.46],
+      [0.608, 0.46],
+      [0.608, 0.337],
+      [0.485, 0.337]
+    ],
+    "3": [
+      [0, 0.46],
+      [0.123, 0.46],
+      [0.123, 0.337],
+      [0, 0.337]
+    ]
+  }
+}
