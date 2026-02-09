@@ -40,7 +40,6 @@ parser.add_argument(
     help="The base name of the file with the calibration data (i.e., without \
 the '.pkl' extension)",
     default="calibration_data.pkl",
-    required=True,
 )
 parser.add_argument(
     "-o",
