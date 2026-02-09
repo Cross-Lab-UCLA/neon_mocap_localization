@@ -59,7 +59,7 @@ parser.add_argument(
     "--calibration_name",
     help="The base name of the file with the calibration data (i.e., without \
 the '.pkl' extension)",
-    default="calibration_data",
+    default="calibration_data.pkl",
 )
 
 args = vars(parser.parse_args())

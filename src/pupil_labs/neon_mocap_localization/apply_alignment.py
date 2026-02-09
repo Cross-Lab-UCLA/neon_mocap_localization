@@ -39,7 +39,7 @@ parser.add_argument(
     "--calibration_name",
     help="The base name of the file with the calibration data (i.e., without \
 the '.pkl' extension)",
-    default="calibration_data",
+    default="calibration_data.pkl",
     required=True,
 )
 parser.add_argument(
@@ -81,7 +81,7 @@ marker_positions = pd.read_csv(args["mocap_path"])
 
 # load calibration data
 
-with open(args["calibration_name"] + ".pkl", "rb") as file:
+with open(args["calibration_name"], "rb") as file:
     calibration_data = pickle.load(file)  # noqa: S301
 
     neon_camera_pose_relative_to_markers = calibration_data[
