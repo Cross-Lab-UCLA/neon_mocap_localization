@@ -1,0 +1,12 @@
+{
+  "qualisys_reference_marker": "",
+  "mocap_unit_conversion_factor": 0.001,
+  "neon_marker_labels": {
+    "Left Top": "NEON_MAKER_1",
+    "Left Middle": "NEON_MAKER_3",
+    "Left Bottom": "NEON_MAKER_4",
+    "Right Top": "NEON_MAKER_2",
+    "Right Middle": "NEON_MAKER_5",
+    "Right Bottom": "NEON_MAKER_6"
+  }
+}
