@@ -9,14 +9,10 @@ By combining these data streams during post-processing, users can generate 3D ga
 - **Frames:** _Every Move You Make_, _I Can Track Clearly Now_, and custom frames with IR markers.
 - **Headwear:** Custom markers placed directly on the head, or on a well-fitting cap/hat.
 
----
-
 ### Important: Validation
 
 > [!TIP]
 > Note: It is strongly recommended to pilot the complete workflow (Data Collection through to Data Processing) using test data prior to experimental data collection. Validating the pipeline ensures that hardware positioning, marker visibility, and time synchronization protocols are correctly configured before subject recruitment begins.
-
----
 
 ## Time Synchronization
 
@@ -31,16 +27,12 @@ Before proceeding to data collection, it is critical to establish a proper time 
 - **Vicon:** You will need a Vicon Lock Box. These boxes can provide TTL sync triggers. An Arduino can receive these triggers and forward them to a [pyserial](https://www.pyserial.com/docs) instance running on an attached computer, which can then transform them to Neon [Events](https://docs.pupil-labs.com/neon/data-collection/events/) to be sent over [the Real-time API](https://pupil-labs.github.io/pl-realtime-api/dev/methods/simple/remote-control/#save-events). Make sure to take into account the latency of the `TTL->Arduino->pyserial` pathway and to send an [offset-corrected Event to Neon](https://docs.pupil-labs.com/neon/data-collection/time-synchronization/#improving-synchronization-further).
   - Alternatively, you can use a Raspberry Pi to receive the TTL triggers and directly convert those to be sent as offset-corrected Neon Events. This then removes the `Arduino->pyserial` part of the chain.
 
----
-
 ## Workflow Options
 
 We provide two different workflows for localizing Neon in MoCap coordinates:
 
 - **Workflow A -> Assume standard configuration:** This workflow assumes that you can sacrifice a bit of accuracy for ease of use. It depends on using either the _Every Move You Make_ or _I Can Track Clearly Now_ frames.
 - **Workflow B -> Precise, person-specific mount localization:** This workflow is for research scenarios that seek as much accuracy as possible or for custom frames/mounts.
-
----
 
 ## Workflow A - Standard Configuration Overview
 
@@ -51,8 +43,6 @@ This procedure consists of two phases:
 
 1. **Phase 1 - Data Collection:** Wear Neon with a standardized IR marker configuration while recording.
 2. **Phase 2 - Data Processing:** Time sync the MoCap and Neon data and apply the standard alignment.
-
----
 
 ## Phase 1: Data Collection
 
@@ -76,8 +66,6 @@ If you use any other configuration, then the provided script will produce inaccu
 ### 2. Recording Experimental Trials
 
 Experimental trials may now proceed.
-
----
 
 ## Phase 2: Data Processing
 
@@ -141,8 +129,6 @@ The `config.json` file controls the localization parameters. Ensure these match 
 
 </details>
 
----
-
 ## Workflow B - Precise Mount Localization Overview
 
 <details>
@@ -151,8 +137,6 @@ This procedure consists of two phases:
 
 1. **Phase 1 - Data Collection:** Recording the necessary calibration sequences and experimental trials.
 2. **Phase 2 - Data Processing:** Calculating the transformation matrix and applying it to experimental data.
-
----
 
 ## Phase 1: Data Collection
 
@@ -192,8 +176,6 @@ Once the calibration sequence is complete, experimental trials may proceed.
 
 - The calibration board is not required for these trials.
 - The participant must not move or remove the Neon frame (or markers) between the calibration sequence and the experimental trials.
-
----
 
 ## Phase 2: Data Processing
 
@@ -288,8 +270,6 @@ Apply the transformation matrix generated in Step A to the **Experimental Trials
 _(Refer to the script help arguments `python apply_alignment.py -h` for instructions on applying a saved transformation to new files)._
 
 </details>
-
----
 
 ## Troubleshooting
 
