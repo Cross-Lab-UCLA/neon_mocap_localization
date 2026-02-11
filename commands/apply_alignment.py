@@ -154,4 +154,4 @@ marker_positions["gaze_dir_X"] = gaze_dirs[:, 0]
 marker_positions["gaze_dir_Y"] = gaze_dirs[:, 1]
 marker_positions["gaze_dir_Z"] = gaze_dirs[:, 2]
 
-marker_positions.to_csv("marker_positions_w_gaze.csv")
+marker_positions.to_csv(args["output_path"])
