@@ -33,3 +33,36 @@ def unproject_points(
         points_3d /= np.linalg.norm(points_3d, axis=1)[:, np.newaxis]  # type: ignore
 
     return points_3d
+
+
+def cartesian_to_spherical(points_3d):
+    """Convert points in 3D Cartesian coordinates to spherical coordinates.
+
+    For elevation:
+      - Neutral orientation = 0 (i.e., parallel with horizon)
+      - Upwards is positive
+      - Downwards is negative
+
+    For azimuth:
+      - Neutral orientation = 0 (i.e., aligned with magnetic North)
+      - Leftwards is positive
+      - Rightwards is negative
+    """
+    x = points_3d[0]
+    y = points_3d[1]
+    z = points_3d[2]
+
+    radii = np.sqrt(x**2 + y**2 + z**2)
+
+    elevation = -(np.arccos(z / radii) - np.pi / 2)
+    azimuth = np.arctan2(y, x) - np.pi / 2
+
+    # Keep all azimuth values in the range of [-180, 180] to remain
+    # consistent with the yaw orientation values provided by the IMU.
+    azimuth[azimuth < -np.pi] += 2 * np.pi
+    azimuth[azimuth > np.pi] -= 2 * np.pi
+
+    elevation = np.rad2deg(elevation)
+    azimuth = np.rad2deg(azimuth)
+
+    return elevation, azimuth
