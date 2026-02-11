@@ -18,9 +18,136 @@ By combining these data streams during post-processing, users can generate 3D ga
 
 ---
 
-## Workflow Overview
+## Time Synchronization
 
-The procedure consists of two phases:
+Before proceeding to data collection, it is critical to establish a proper time synchronization protocol. Select the method appropriate for the hardware in use.
+
+- **General Rule:** Start Neon recording **first**, then MoCap. Stop MoCap **first**, then Neon last.
+- **Lab Streaming Layer (LSL):** Start LabRecorder **first**, then start/stop the Neon & MoCap streams according to the **General Rule**. Stop LabRecorder **last**.
+
+**Specific Vendor Instructions:**
+
+- **Qualisys / OptiTrack:** Use the **Lab Streaming Layer (LSL)** method. Capture Neon's LSL Gaze Stream and the MoCap LSL streams. If using Optitrack, make sure Motive's start/stop events are recorded via LSL.
+- **Vicon:** You will need a Vicon Lock Box. These boxes can provide TTL sync triggers. An Arduino can receive these triggers and forward them to a [pyserial](https://www.pyserial.com/docs) instance running on an attached computer, which can then transform them to Neon [Events](https://docs.pupil-labs.com/neon/data-collection/events/) to be sent over [the Real-time API](https://pupil-labs.github.io/pl-realtime-api/dev/methods/simple/remote-control/#save-events). Make sure to take into account the latency of the `TTL->Arduino->pyserial` pathway and to send an [offset-corrected Event to Neon](https://docs.pupil-labs.com/neon/data-collection/time-synchronization/#improving-synchronization-further).
+  - Alternatively, you can use a Raspberry Pi to receive the TTL triggers and directly convert those to be sent as offset-corrected Neon Events. This then removes the `Arduino->pyserial` part of the chain.
+
+---
+
+## Workflow Options
+
+We provide two different workflows for localizing Neon in MoCap coordinates:
+
+- **Workflow A -> Assume standard configuration:** This workflow assumes that you can sacrifice a bit of accuracy for ease of use. It depends on using either the _Every Move You Make_ or _I Can Track Clearly Now_ frames.
+- **Workflow B -> Precise, person-specific mount localization:** This workflow is for research scenarios that seek as much accuracy as possible or for custom frames/mounts.
+
+---
+
+## Workflow A - Standard Configuration Overview
+
+<details>
+  <summary>View instructions</summary>
+
+This procedure consists of two phases:
+
+1. **Phase 1 - Data Collection:** Wear Neon with a standardized IR marker configuration while recording.
+2. **Phase 2 - Data Processing:** Time sync the MoCap and Neon data and apply the standard alignment.
+
+---
+
+## Phase 1: Data Collection
+
+### 1. Hardware Requirements
+
+This procedure requires the _Every Move You Make_ or _I Can Track Clearly Now_ frames.
+
+Before recording, you must place the IR markers on the frames in the following standard configuration:
+
+- Left Side (when wearing):
+  - Top Marker - 5cm stick
+  - Middle Marker - 6cm stick
+  - Bottom Marker - 5cm stick
+- Right Side (when wearing):
+  - Top Marker - 6cm stick
+  - Middle Marker - 5cm stick
+  - Bottom Marker - 6cm stick
+
+If you use any other configuration, then the provided script will produce inaccurate results.
+
+### 2. Recording Experimental Trials
+
+Experimental trials may now proceed.
+
+---
+
+## Phase 2: Data Processing
+
+Processing is performed after data collection is complete.
+
+### 1. Installation
+
+Create a Python virtual environment and install the required dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Then, install this package into the virtual environment:
+
+```bash
+pip install -e .
+```
+
+### 2. Data Preparation
+
+Sync and convert the Motion Capture data to the required CSV format before localization. Make sure
+to provide the arguments specified in the respective command's help display.
+
+#### For Qualisys
+
+```bash
+python ./commands/convert_qualisys_to_csv.py -h
+```
+
+#### For OptiTrack
+
+```bash
+python ./commands/convert_optitrack_to_csv.py -h
+```
+
+#### For Vicon
+
+```bash
+python ./commands/convert_vicon_to_csv.py -h
+```
+
+### 3. Configuration (`config.json`)
+
+The `config.json` file controls the localization parameters. Ensure these match the physical setup. See the example in `examples/config_standard.json` for reference.
+
+| Key                            | Type   | Description                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `qualisys_reference_marker`    | String | A clearly detected marker label used for Qualisys LSL time sync. Leave as the empty string, "", if you do not use a Qualisys device.                                                                                                                                                                     |
+| `T_neon_to_mocap`              | Matrix | Transformation matrix aligning Neon's coordinate system with the MoCap system.                                                                                                                                                                                                                           |
+| `apriltag_black_side_length`   | Float  | The length of one black side of a printed AprilTag (in **meters**).                                                                                                                                                                                                                                      |
+| `ir_marker_radius`             | Float  | The radius of the physical IR markers (in **meters**; default: `0.006`).                                                                                                                                                                                                                                 |
+| `apriltag_pattern_width`       | Float  | The distance from the top left corner of the top left AprilTag to the top right corner of the top right AprilTag (in **meters**).                                                                                                                                                                        |
+| `apriltag_pattern_height`      | Float  | The distance from the top left corner of the top left AprilTag to the bottom left corner of the bottom left AprilTag (in **meters**).                                                                                                                                                                    |
+| `mocap_unit_conversion_factor` | Float  | Internally, the scripts expect distances in meters. If your MoCap system does not record in meters, then use this option to scale it appropriately (default: `0.001`).                                                                                                                                   |
+| `neon_marker_labels`           | Array  | The labels assigned to the headset markers in the MoCap software.                                                                                                                                                                                                                                        |
+| `apriltag_marker_labels`       | Object | A map holding the labels assigned to the calibration board markers. The keys of the map must be "Top Left", "Top Right", "Bottom Right", and "Bottom Left" and should of course correspond to the IR markers in those positions.                                                                         |
+| `apriltags_to_use`             | Array  | List of AprilTag IDs used on your board (e.g., `[0, 1, 2, 3]`).                                                                                                                                                                                                                                          |
+| `corner_unit_conversion`       | Float  | Multiplier if your local coordinates are not in meters (default: `1.0`).                                                                                                                                                                                                                                 |
+| `apriltag_corner_local_coords` | Object | If using the `Local Corner Measurement` method (see below), the local (X,Y) coordinates of the 16 AprilTag corners (default is meters, but other units are acceptable, see `corner_unit_conversion`). The coordinates are saved as array values in a map whose keys are the IDs from `apriltags_to_use`. |
+
+</details>
+
+---
+
+## Workflow B - Precise Mount Localization Overview
+
+<details>
+  <summary>View instructions</summary>
+This procedure consists of two phases:
 
 1. **Phase 1 - Data Collection:** Recording the necessary calibration sequences and experimental trials.
 2. **Phase 2 - Data Processing:** Calculating the transformation matrix and applying it to experimental data.
@@ -50,19 +177,7 @@ By default, the scripts assume the following MoCap configuration based on a cali
 > [!TIP]
 > Note: If a different convention is used, the `T_neon_to_mocap` matrix in `config.json` must be modified. It will most likely need to be a [permutation matrix](https://en.wikipedia.org/wiki/Permutation_matrix). Note that Neon follows OpenCV conventions (see the [Neon 3D eye pose diagram](https://docs.pupil-labs.com/neon/data-collection/data-streams/#_3d-eye-poses)).
 
-### 3. Time Synchronization
-
-Proper time synchronization is critical. Select the method appropriate for the hardware in use.
-
-- **General Rule:** Start Neon recording **first**, then MoCap. Stop MoCap **first**, then Neon last.
-- **Lab Streaming Layer (LSL):** Start LabRecorder **first**, then start/stop the Neon & MoCap streams according to the **General Rule**. Stop LabRecorder **last**.
-
-**Specific Vendor Instructions:**
-
-- **Qualisys / OptiTrack:** Use the **Lab Streaming Layer (LSL)** method. Capture Neon's LSL Gaze Stream and the MoCap LSL streams. If using Optitrack, make sure Motive's start/stop events are recorded via LSL.
-- **Vicon:** Ensure Vicon and Neon are synchronised via standard [Pupil Labs Time Sync](https://www.google.com/search?q=https://docs.pupil-labs.com/core/software/pupil-capture/%23time-sync) protocols.
-
-### 4. Recording the Calibration Sequence
+### 3. Recording the Calibration Sequence
 
 A dedicated recording is required to compute the transformation matrix.
 
@@ -71,7 +186,7 @@ A dedicated recording is required to compute the transformation matrix.
 3. **Procedure:** The participant should gaze at the center of the board and at each AprilTag for ~15-20 seconds, while keeping their head still.
 4. **Visibility:** Ensure the MoCap cameras detect all markers (frame and board) and that the Neon scene camera detects the AprilTags for the duration of the recording.
 
-### 5. Recording Experimental Trials
+### 4. Recording Experimental Trials
 
 Once the calibration sequence is complete, experimental trials may proceed.
 
@@ -101,7 +216,7 @@ pip install -e .
 ### 2. Data Preparation
 
 Sync and convert the Motion Capture data to the required CSV format before localization. Make sure
-to provide the arguments specified in the respective commands help display.
+to provide the arguments specified in the respective command's help display.
 
 #### For Qualisys
 
@@ -123,7 +238,7 @@ python ./commands/convert_vicon_to_csv.py -h
 
 ### 3. Configuration (`config.json`)
 
-The `config.json` file controls the localization parameters. Ensure these match the physical setup. See the example in `examples/config.json` for reference.
+The `config.json` file controls the localization parameters. Ensure these match the physical setup. See the example in `examples/config_precise.json` for reference. The parameters necessary for a precise calibration are detailed in the table below:
 
 | Key                            | Type   | Description                                                                                                                                                                                                                                                                                              |
 | ------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -142,7 +257,7 @@ The `config.json` file controls the localization parameters. Ensure these match 
 
 ### 4. Step A: Compute Calibration
 
-Run the main script using the **Calibration Sequence** (from Phase 1, Step 4) to generate the pose file.
+Run the main script using the **Calibration Sequence** (from Phase 1, Step 3) to generate the pose file.
 
 There are two methods for establishing the board's position:
 
@@ -171,6 +286,8 @@ python ./commands/mocap_compute_alignment.py -r [Neon_Folder] -m [MoCap_CSV] -c 
 Apply the transformation matrix generated in Step A to the **Experimental Trials** with the `apply_alignment.py` script. This generates the final CSV file with gaze data in MoCap space.
 
 _(Refer to the script help arguments `python apply_alignment.py -h` for instructions on applying a saved transformation to new files)._
+
+</details>
 
 ---
 
