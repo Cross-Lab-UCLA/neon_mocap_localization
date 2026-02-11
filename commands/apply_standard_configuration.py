@@ -174,8 +174,16 @@ for frame in tqdm(range(len(marker_positions))):
     markers_for_calib = marker_positions.iloc[frame]
 
     curr_neon_markers = []
-    for marker in config["neon_marker_labels"]:
-        curr_neon_markers.append(  # noqa: PERF401
+    for marker_name in [
+        "Left Top",
+        "Left Middle",
+        "Left Bottom",
+        "Right Top",
+        "Right Middle",
+        "Right Bottom",
+    ]:
+        marker = config["neon_marker_labels"][marker_name]
+        curr_neon_markers.append(
             np.array([
                 markers_for_calib[f"{marker}_X"].squeeze()
                 * config["mocap_unit_conversion_factor"],
