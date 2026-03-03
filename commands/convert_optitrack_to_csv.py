@@ -31,6 +31,12 @@ parser.add_argument(
     help="The path, in which to save the converted marker data",
     required=True,
 )
+parser.add_argument(
+    "-t",
+    "--trial_number",
+    help="The trial number, used to align the start time of the OptiTrack data with the Neon data. If not provided, will use the first trial found in the xdf events.",
+    required=False,
+)
 
 args = vars(parser.parse_args())
 
@@ -50,15 +56,12 @@ except Exception:
         raise ValueError("Not a valid Neon data directory") from e
 
 # load xdf
-
 xdf_data = pyxdf.load_xdf(args["xdf_path"])
 
 # load raw optitrack data
-
 opti_data = Take().readCSV(args["optitrack"])
 
 # find the neon events channel in xdf
-
 xdf_events_idx = 0
 xdf_event_data = None
 while True:
@@ -104,14 +107,35 @@ if xdf_gaze_data_idx > len(xdf_data[0]) or xdf_gaze_data is None:
 
 # since mocap starts after neon and ends before it, we can just shift the base
 # mocap relative timestamps by that amount
+mocap_start_labels = xdf_mocap_event_data["time_series"]
+motive_start_idx = None
+for i, events in enumerate(xdf_mocap_event_data["time_series"]):
+    if 'MotiveStart' in events:  # only select label ['MotiveStart']
+        motive_start_idx = i
+        break
 
+if motive_start_idx is None:
+    raise ValueError("No MotiveStart event found in mocap data!")
+
+if args["trial_number"] is not None:
+    trial_number = int(args["trial_number"])
+    start_idx = trial_number - 1
+    print(f"\nAligning to trial number {args['trial_number']} (index {start_idx})") 
+else:
+    start_idx = 0
+    print("\nAligning to first event instance of MotiveStart.")
+    
 opti_in_neon_offset = (
-    xdf_mocap_event_data["time_stamps"][0] - xdf_event_data["time_stamps"][0]
+    xdf_mocap_event_data["time_stamps"][start_idx] - xdf_event_data["time_stamps"][0]
 )
+
+print("Alignment:")
+print(f"Timeline offset: {opti_in_neon_offset:.3f} seconds")
+print(f"Mocap start time:  {xdf_mocap_event_data['time_stamps'][start_idx]:.3f}s")
+print(f"Neon start time:    {xdf_event_data['time_stamps'][0]:.3f}s")
 
 # write the data out, synced & in a format compatible with the main localization
 # script
-
 output_df = pd.DataFrame({})
 
 marker_time = opti_data.markers[next(iter(opti_data.markers.keys()))].times
@@ -120,8 +144,24 @@ output_df["timestamp [ns]"] = ((marker_time + opti_in_neon_offset) * 1e9).astype
 ) + neon_rec.info["start_time"]  # type: ignore
 
 for marker in opti_data.markers:
-    marker_positions = np.array(opti_data.markers[marker].positions)
+    # if there are missing frames, insert NaNs for those frames
+    positions = opti_data.markers[marker].positions
+    n_frames  = len(positions)
+    marker_positions = np.full((n_frames, 3), np.nan, dtype=float)
+    for i, p in enumerate(positions):
+        if p is None:
+            continue
+        
+        if not hasattr(p, "__len__"):
+            continue
 
+        L = min(len(p), 3)
+        for j in range(L):
+            marker_positions[i, j] = p[j]
+    
+    #marker_positions = np.array(opti_data.markers[marker].positions) 
+    
+    # save to output
     output_df[f"{marker}_X"] = marker_positions[:, 0]
     output_df[f"{marker}_Y"] = marker_positions[:, 1]
     output_df[f"{marker}_Z"] = marker_positions[:, 2]
