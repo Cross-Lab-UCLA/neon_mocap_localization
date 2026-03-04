@@ -76,7 +76,7 @@ except Exception:
 
 # load mocap data
 
-marker_positions = pd.read_csv(args["mocap_path"])
+marker_positions = pd.read_csv(args["mocap_path"],index_col=0)
 
 # load calibration data
 
