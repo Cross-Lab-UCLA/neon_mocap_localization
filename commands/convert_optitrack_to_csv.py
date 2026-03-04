@@ -108,22 +108,27 @@ if xdf_gaze_data_idx > len(xdf_data[0]) or xdf_gaze_data is None:
 # since mocap starts after neon and ends before it, we can just shift the base
 # mocap relative timestamps by that amount
 mocap_start_labels = xdf_mocap_event_data["time_series"]
-motive_start_idx = None
+
+motive_start_indices = []
 for i, events in enumerate(xdf_mocap_event_data["time_series"]):
     if 'MotiveStart' in events:  # only select label ['MotiveStart']
-        motive_start_idx = i
-        break
+        motive_start_indices.append(i)
 
-if motive_start_idx is None:
+print(f"Total number of MotiveStart trials found: {len(motive_start_indices)}")
+
+if len(motive_start_indices) == 0:
     raise ValueError("No MotiveStart event found in mocap data!")
 
 if args["trial_number"] is not None:
     trial_number = int(args["trial_number"])
     start_idx = trial_number - 1
-    print(f"\nAligning to trial number {args['trial_number']} (index {start_idx})") 
+    
+    if start_idx >= len(motive_start_indices):
+        raise ValueError(f"Trial {trial_number} exceeds {len(motive_start_indices)} trials found")
+    print(f"\nAligning to trial number {trial_number} (index {start_idx})") 
 else:
-    start_idx = 0
-    print("\nAligning to first event instance of MotiveStart.")
+    start_idx = motive_start_indices[0]
+    print(f"\nAligning to first MotiveStart trial (index {start_idx})")
     
 opti_in_neon_offset = (
     xdf_mocap_event_data["time_stamps"][start_idx] - xdf_event_data["time_stamps"][0]
