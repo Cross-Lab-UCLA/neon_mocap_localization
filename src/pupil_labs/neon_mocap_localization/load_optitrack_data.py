@@ -199,7 +199,8 @@ class Take:
         assert line1[0] == "Format Version", f"Unrecognized header cell: {line1[0]}"
         format_ = line1[1]
 
-        assert format_ == "1.21" or format_ == "1.2" or format_ == "1.24", (
+        # EMMA'S CHANGE: now accepts OptiTrack export format 1.25 (originally did not include)
+        assert format_ == "1.21" or format_ == "1.2" or format_ == "1.24" or format_ == "1.25", (
             f"Unsupported format version: {line1[1]}"
         )
 
@@ -243,6 +244,10 @@ class Take:
         # Line 6 designates the data type for each column: Rotation, Position,
         # Error Per Marker, Marker Quality
         line6 = next(stream)
+        
+        # EMMA'S CHANGE: format 1.25 adds a "Parent" row between ID and Position row, must skip it
+        if len(line6) > 1 and line6[1] == "Parent":
+            line6 = next(stream)
         self._raw_fields = line6[2:]
 
         # Line 7 designates the specific axis: Frame, Time, X, Y, Z, W, or blank
@@ -275,7 +280,8 @@ class Take:
                     setter = body._set_rotation
                     self._column_map.append(ColumnMapping(setter, axis_index, col))
 
-                elif field == "Position":
+                # EMMA'S CHANGE: format 1.25 adds a "Size" column after X/Y/Z for each marker, must ignore it
+                elif field == "Position" and axis in ("X", "Y", "Z"):
                     axis_index = {"X": 0, "Y": 1, "Z": 2}[axis]
                     setter = body._set_position
                     self._column_map.append(ColumnMapping(setter, axis_index, col))
@@ -288,7 +294,8 @@ class Take:
                     self.markers[label] = marker
 
                 # create a column map entry for each marker axis
-                if field == "Position":
+                # EMMA'S CHANGE: format 1.25 adds a "Size" column after X/Y/Z for each marker, must ignore it
+                if field == "Position" and axis in ("X", "Y", "Z"):
                     axis_index = {"X": 0, "Y": 1, "Z": 2}[axis]
                     setter = marker._set_position
                     self._column_map.append(ColumnMapping(setter, axis_index, col))
