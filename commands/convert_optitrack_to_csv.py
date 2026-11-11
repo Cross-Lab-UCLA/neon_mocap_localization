@@ -90,20 +90,21 @@ if xdf_mocap_events_idx > len(xdf_data[0]) or xdf_mocap_event_data is None:
     # TODO: raise error
     pass
 
-# find the gaze data channel in xdf
+# EMMA'S CHANGE: commented out gaze stream search because some recordings did not have it (e.g. sub-PDIG02 calibration XDF) 
+# xdf_gaze_data was found here but never used afterward (timing uses the Neon Events and Motive streams)
 
-xdf_gaze_data_idx = 0
-xdf_gaze_data = None
-while True:
-    if "Neon Companion_Neon Gaze" in xdf_data[0][xdf_gaze_data_idx]["info"]["name"]:
-        xdf_gaze_data = xdf_data[0][xdf_gaze_data_idx]
-        break
-    else:
-        xdf_gaze_data_idx += 1
+# xdf_gaze_data_idx = 0
+# xdf_gaze_data = None
+# while True:
+#     if "Neon Companion_Neon Gaze" in xdf_data[0][xdf_gaze_data_idx]["info"]["name"]:
+#         xdf_gaze_data = xdf_data[0][xdf_gaze_data_idx]
+#         break
+#     else:
+#         xdf_gaze_data_idx += 1
 
-if xdf_gaze_data_idx > len(xdf_data[0]) or xdf_gaze_data is None:
+# if xdf_gaze_data_idx > len(xdf_data[0]) or xdf_gaze_data is None:
     # TODO: raise error
-    pass
+#     pass
 
 # since mocap starts after neon and ends before it, we can just shift the base
 # mocap relative timestamps by that amount
@@ -112,6 +113,12 @@ mocap_start_labels = xdf_mocap_event_data["time_series"]
 motive_start_indices = []
 for i, events in enumerate(xdf_mocap_event_data["time_series"]):
     if 'MotiveStart' in events:  # only select label ['MotiveStart']
+        # EMMA'S CHANGE: skip takes that are less than 1 s long (stop event < 1 s after start)
+        ts = xdf_mocap_event_data["time_stamps"]
+        nxt = xdf_mocap_event_data["time_series"][i + 1] if i + 1 < len(ts) else []
+        if 'MotiveStop' in nxt and ts[i + 1] - ts[i] < 1.0:
+            print(f"Skipping very short take at event {i} ({ts[i + 1] - ts[i]:.3f} s)")
+            continue
         motive_start_indices.append(i)
 
 print(f"Total number of MotiveStart trials found: {len(motive_start_indices)}")
@@ -121,11 +128,15 @@ if len(motive_start_indices) == 0:
 
 if args["trial_number"] is not None:
     trial_number = int(args["trial_number"])
-    start_idx = trial_number - 1
+    # EMMA'S CHANGE: fix trial alignment (previous code used start_idx = trial_number - 1 
+    # which meant every trial after trial 1 was misaligned)
+    # now start_idx uses the corresponding position in motive_start_indices list (contains all MotiveStart events)
+    pos = trial_number - 1
     
-    if start_idx >= len(motive_start_indices):
+    if pos >= len(motive_start_indices):
         raise ValueError(f"Trial {trial_number} exceeds {len(motive_start_indices)} trials found")
-    print(f"\nAligning to trial number {trial_number} (index {start_idx})") 
+    start_idx = motive_start_indices[pos]  # event index of this trial's MotiveStart
+    print(f"\nAligning to trial number {trial_number} (event index {start_idx})") 
 else:
     start_idx = motive_start_indices[0]
     print(f"\nAligning to first MotiveStart trial (index {start_idx})")
