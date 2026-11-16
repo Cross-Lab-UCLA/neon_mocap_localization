@@ -48,13 +48,6 @@ sessions.",
     required=True,
 )
 parser.add_argument(
-    "-s",
-    "--surface_gaze_path",
-    help="The path to surface mapped gaze (optional). If provided, then this \
-method will be prioritized. See the README.md for more info.",
-    default="",
-)
-parser.add_argument(
     "-x",
     "--calibration_name",
     help="The base name of the file with the calibration data (i.e., without \
@@ -109,22 +102,23 @@ if tag_corner_coordinates:
 
         tag_corner_coordinates[k] = m
 
-    for k, v in tag_corner_coordinates.items():
+    for _k, v in tag_corner_coordinates.items():
         v[:, 0] -= plane_width / 2
         v[:, 1] -= plane_height / 2
 
-        for c in range(len(tag_corner_coordinates[k])):
-            tag_corner_coordinates[k][c] = np.array(config["T_neon_to_mocap"]) @ v[c]
+        # for c in range(len(tag_corner_coordinates[k])):
+        # tag_corner_coordinates[k][c] = np.array(config["T_neon_to_mocap"]) @ v[c]
 
-    plane_points_3d = np.array([
-        [-plane_width / 2, plane_height / 2, 0],  # BL
-        [plane_width / 2, plane_height / 2, 0],  # BR
-        [plane_width / 2, -plane_height / 2, 0],  # TR
-        [-plane_width / 2, -plane_height / 2, 0],  # TL
-        [-plane_width / 2, plane_height / 2, 0],  # BL
-    ])
-    for c in range(len(plane_points_3d)):
-        plane_points_3d[c] = np.array(config["T_neon_to_mocap"]) @ plane_points_3d[c]
+
+plane_points_3d = np.array([
+    [-plane_width / 2, plane_height / 2, 0],  # BL
+    [plane_width / 2, plane_height / 2, 0],  # BR
+    [plane_width / 2, -plane_height / 2, 0],  # TR
+    [-plane_width / 2, -plane_height / 2, 0],  # TL
+    [-plane_width / 2, plane_height / 2, 0],  # BL
+])
+# for c in range(len(plane_points_3d)):
+# plane_points_3d[c] = np.array(config["T_neon_to_mocap"]) @ plane_points_3d[c]
 
 neon = Neon(recording=neon_rec)
 apriltag_detector = Detector(
@@ -146,16 +140,38 @@ best_plane: AprilTags
 for frame in tqdm(range(int(nframes))):
     neon_timestamp = neon_rec.scene.time[frame]
 
+    if (
+        neon_timestamp < marker_positions["timestamp [ns]"].iloc[0]
+        or neon_timestamp > marker_positions["timestamp [ns]"].iloc[-1]
+    ):
+        continue
+
     # find the equivalent marker positions based on neon timestamp
     diffs = (marker_positions["timestamp [ns]"] - neon_timestamp).abs()  # type: ignore
     markers_for_calib = marker_positions.iloc[diffs.idxmin()]  # type: ignore
 
+    good_marker_data = True
     if (
         f"{config['apriltag_marker_labels']['Top Left']}_X" in markers_for_calib.keys()  # noqa: SIM118
-        and np.isnan(
-            markers_for_calib[f"{config['apriltag_marker_labels']['Top Left']}_X"].any()
-        )
     ):
+        for marker_corners in ["Top Left", "Top Right", "Bottom Right", "Bottom Left"]:
+            for coord in ["X", "Y", "Z"]:
+                if np.isnan(
+                    markers_for_calib[
+                        f"{config['apriltag_marker_labels'][marker_corners]}_{coord}"
+                    ]
+                ):
+                    good_marker_data = False
+
+    if (
+        f"{config['neon_marker_labels'][0]}_X" in markers_for_calib.keys()  # noqa: SIM118
+    ):
+        for neon_marker in config["neon_marker_labels"]:
+            for coord in ["X", "Y", "Z"]:
+                if np.isnan(markers_for_calib[f"{neon_marker}_{coord}"]):
+                    good_marker_data = False
+
+    if not good_marker_data:
         continue
 
     if isinstance(neon_rec, CloudRecording):
@@ -166,56 +182,6 @@ for frame in tqdm(range(int(nframes))):
     if apriltag_img is None:
         continue
 
-    surface_gaze_image_pts = None
-    surface_gaze_object_pts = None
-    if args["surface_gaze_path"] != "":
-        surface_positions = pd.read_csv(args["surface_gaze_path"])
-
-        gaze_on_surface_x = (
-            surface_positions["gaze position on surface x [normalized]"].to_numpy()
-            * plane_width
-        ) - plane_width / 2
-
-        gaze_on_surface_y = (
-            surface_positions["gaze position on surface y [normalized]"].to_numpy()
-            * plane_height
-        ) - plane_height / 2
-
-        good_idxs = (
-            (gaze_on_surface_x < 1.0)
-            & (gaze_on_surface_x > 0.0)
-            & (gaze_on_surface_y < 1.0)
-            & (gaze_on_surface_y > 0.0)
-        )
-        good_gaze_on_surface_x = gaze_on_surface_x[good_idxs]
-        good_gaze_on_surface_y = gaze_on_surface_y[good_idxs]
-
-        good_gaze_on_surface_ts = surface_positions.iloc[good_idxs][
-            "timestamp [ns]"
-        ].to_numpy()
-
-        surface_gaze_object_pts = np.zeros(
-            (len(good_gaze_on_surface_ts), 3), dtype=np.float32
-        )
-        surface_gaze_object_pts[:, 0] = good_gaze_on_surface_x
-        surface_gaze_object_pts[:, 1] = good_gaze_on_surface_y
-
-        surface_gaze_object_pts = (
-            config["T_neon_to_mocap"] @ surface_gaze_object_pts.T
-        ).T
-
-        good_gaze_2d = neon_rec.gaze.sample(good_gaze_on_surface_ts)
-
-        surface_gaze_image_pts = np.zeros(
-            (len(good_gaze_on_surface_ts), 2), dtype=np.float32
-        )
-        if isinstance(good_gaze_2d, dict):
-            surface_gaze_image_pts[:, 0] = good_gaze_2d["point_x"]
-            surface_gaze_image_pts[:, 1] = good_gaze_2d["point_y"]
-        else:
-            surface_gaze_image_pts[:, 0] = good_gaze_2d.data["point_x"]
-            surface_gaze_image_pts[:, 1] = good_gaze_2d.data["point_y"]
-
     neon_apriltags = AprilTags(
         apriltag_detector,
         neon,
@@ -223,8 +189,6 @@ for frame in tqdm(range(int(nframes))):
         apriltag_img,
         tag_corner_coordinates,
         config["apriltags_to_use"],
-        surface_gaze_object_pts,
-        surface_gaze_image_pts,
     )
     if neon_apriltags.good_detection:
         if neon_apriltags.error < smallest_error:
@@ -294,6 +258,7 @@ for marker in config["neon_marker_labels"]:
 
 mocap_surface.construct_pose_simple(
     config["ir_marker_radius"],
+    np.array(config["T_mocap_to_apriltag"]),
     orient_towards=np.array([
         mocap_head.markers[0].Xs,
         mocap_head.markers[0].Ys,

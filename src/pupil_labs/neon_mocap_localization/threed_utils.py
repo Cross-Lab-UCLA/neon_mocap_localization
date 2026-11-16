@@ -30,12 +30,14 @@ def unproject_points(
 
     if normalize:
         # normalize vector length to 1
-        points_3d /= np.linalg.norm(points_3d, axis=1)[:, np.newaxis]  # type: ignore
+        points_3d /= np.linalg.norm(points_3d, axis=1)[:, np.newaxis]
 
     return points_3d
 
 
-def cartesian_to_spherical(points_3d):
+def cartesian_to_spherical(
+    points_3d: npt.NDArray[np.float64],
+) -> tuple[npt.NDArray, npt.NDArray]:
     """Convert points in 3D Cartesian coordinates to spherical coordinates.
 
     For elevation:

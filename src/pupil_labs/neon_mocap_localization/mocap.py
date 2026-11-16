@@ -228,6 +228,7 @@ class MocapSurface:
     def construct_pose_simple(
         self,
         ir_marker_radius: float,
+        T_mocap_to_apriltag: npt.NDArray[np.float64],
         orient_towards: npt.NDArray[np.float64] | None = None,
     ) -> bool:
         """Construct the estimated pose of the surface in mocap system."""
@@ -280,6 +281,9 @@ class MocapSurface:
             R[:, 0] = self.x_axis
             R[:, 1] = self.y_axis
             R[:, 2] = self.normal
+
+            R = T_mocap_to_apriltag @ R
+
         except Exception:
             return False
 

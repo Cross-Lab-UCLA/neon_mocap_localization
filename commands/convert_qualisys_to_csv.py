@@ -1,381 +1,444 @@
 import argparse
-import json
+import pickle
+import sys
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
-import pyxdf  #  type: ignore
-import scipy.io as sio
-from ezc3d import c3d  #  type: ignore
-from numpy.lib.stride_tricks import sliding_window_view
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
+from matplotlib.figure import Figure
+from PySide6.QtCore import Qt, Slot
+from PySide6.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
+)
 from scipy.interpolate import interp1d
 
-import pupil_labs.neon_recording as plnr
-from pupil_labs.neon_mocap_localization.threed_utils import unproject_points
+from pupil_labs.neon_mocap_localization import time_sync_utils
+from pupil_labs.neon_mocap_localization.qualisys import data_loader
 
 
-def normalize(x: float) -> np.floating:
-    return (x - np.mean(x)) / np.std(x)
+class MainWindow(QMainWindow):
+    def __init__(self, qualisys_rec, mat_export_dir, xdf_export_dir):
+        super().__init__()
+
+        self.qualisys_rec = qualisys_rec
+        self.mat_export_dir = mat_export_dir
+        self.xdf_export_dir = xdf_export_dir
+
+        self.setWindowTitle("Qualisys <-> Neon Synchronization Tool")
+
+        # Window dimensions
+        geometry = self.screen().availableGeometry()
+        self.setFixedSize(geometry.width() * 0.8, geometry.height() * 0.49)
+
+        self.main_layout = QHBoxLayout()
+        self.central_widget = QWidget()
+
+        self._prepare_qualisys_window()
+        self._prepare_neon_window()
+        self.prepare_export_column()
+
+        self.central_widget.setLayout(self.main_layout)
+        self.setCentralWidget(self.central_widget)
+
+    def _prepare_signal_window(
+        self, prefix, trim_begin_slot, trim_end_slot, update_plot
+    ):
+        fig = Figure(figsize=(5, 4), dpi=100)
+        canvas = FigureCanvas(fig)
+        axes = fig.add_subplot(111)
+        toolbar = NavigationToolbar2QT(canvas, self)
+
+        begin_slider = QSlider(Qt.Horizontal)
+        begin_slider.setMinimum(0)
+        begin_slider.setMaximum(5000)
+        begin_slider.setValue(0)
+        begin_slider.valueChanged.connect(trim_begin_slot)
+        begin_label = QLabel("Trim begin: 0")
+
+        end_slider = QSlider(Qt.Horizontal)
+        end_slider.setMinimum(0)
+        end_slider.setMaximum(5000)
+        end_slider.setValue(0)
+        end_slider.valueChanged.connect(trim_end_slot)
+        end_label = QLabel("Trim end: 0")
+
+        layout = QVBoxLayout()
+        layout.addWidget(toolbar)
+        layout.addWidget(canvas)
+        layout.addWidget(begin_label)
+        layout.addWidget(begin_slider)
+        layout.addWidget(end_label)
+        layout.addWidget(end_slider)
+
+        self.main_layout.addLayout(layout)
+
+        setattr(self, f"{prefix}_fig", fig)
+        setattr(self, f"{prefix}_canvas", canvas)
+        setattr(self, f"{prefix}_axes", axes)
+        setattr(self, f"{prefix}_toolbar", toolbar)
+        setattr(self, f"{prefix}_begin_slider", begin_slider)
+        setattr(self, f"{prefix}_begin_label", begin_label)
+        setattr(self, f"{prefix}_end_slider", end_slider)
+        setattr(self, f"{prefix}_end_label", end_label)
+        setattr(self, f"{prefix}_layout", layout)
+
+        update_plot()
+
+    def _prepare_qualisys_window(self):
+        self._prepare_signal_window(
+            "qtm",
+            self.update_qualisys_trim_begin,
+            self.update_qualisys_trim_end,
+            self.update_qualisys_plot,
+        )
+
+    @Slot(int)
+    def update_qualisys_trim_begin(self, value):
+        self.qtm_begin_label.setText(f"Trim begin: {value}")
+        self.qualisys_rec.qtm_trim_begin = value
+
+        self.update_qualisys_plot()
+
+    @Slot(int)
+    def update_qualisys_trim_end(self, value):
+        self.qtm_end_label.setText(f"Trim end: {value}")
+        self.qualisys_rec.qtm_trim_end = -(value + 1)
+
+        self.update_qualisys_plot()
+
+    def update_qualisys_plot(self):
+        self.qtm_axes.clear()
+
+        self.qtm_axes.set_title("Qualisys Data")
+        self.qtm_axes.set_xlabel("LSL Time [s]")
+        self.qtm_axes.set_ylabel("X position [mm]")
+
+        self.qualisys_rec.qtm_data_for_alignment = self.qualisys_rec.qtm_data_resampled[
+            self.qualisys_rec.qtm_trim_begin : self.qualisys_rec.qtm_trim_end
+        ]
+
+        offs = time_sync_utils.align_signals(
+            self.qualisys_rec.qtm_data_for_alignment,
+            self.qualisys_rec.xdf_data_for_alignment,
+            self.qualisys_rec.xdf_ts_for_alignment,
+        )
+
+        self.qualisys_rec.aligned_qtm_ts = (
+            self.qualisys_rec.qtm_reference_timestamps
+            + self.qualisys_rec.xdf_ts_for_alignment[
+                offs - self.qualisys_rec.qtm_trim_begin
+            ]
+        )
+
+        self.qtm_axes.plot(
+            self.qualisys_rec.xdf_reference_timestamps,
+            self.qualisys_rec.xdf_reference_positions[:, 0].squeeze(),
+        )
+        self.qtm_axes.plot(
+            self.qualisys_rec.aligned_qtm_ts,
+            self.qualisys_rec.qtm_reference_positions[0, :].squeeze(),
+        )
+
+        # mid_idx = len(self.qualisys_rec.aligned_qtm_ts) // 2
+        # mid_ts = self.qualisys_rec.aligned_qtm_ts[mid_idx]
+        # self.qtm_axes.set_xlim(mid_ts - 0.5, mid_ts + 0.5)
+        self.qtm_axes.set_ylim(
+            np.min(self.qualisys_rec.qtm_data_resampled),
+            np.max(self.qualisys_rec.qtm_data_resampled),
+        )
+
+        self.qtm_canvas.draw()
+
+    def _prepare_neon_window(self):
+        self._prepare_signal_window(
+            "neon",
+            self.update_neon_trim_begin,
+            self.update_neon_trim_end,
+            self.update_neon_plot,
+        )
+
+    @Slot(int)
+    def update_neon_trim_begin(self, value):
+        self.neon_begin_label.setText(f"Trim begin: {value}")
+        self.qualisys_rec.neon_trim_begin = value
+
+        self.update_neon_plot()
+
+    @Slot(int)
+    def update_neon_trim_end(self, value):
+        self.neon_end_label.setText(f"Trim end: {value}")
+        self.qualisys_rec.neon_trim_end = -(value + 1)
+
+        self.update_neon_plot()
+
+    def update_neon_plot(self):
+        self.neon_axes.clear()
+
+        self.neon_axes.set_title("Neon Gaze Data")
+        self.neon_axes.set_xlabel("LSL Time [s]")
+        self.neon_axes.set_ylabel("X position [px]")
+
+        self.qualisys_rec.neon_gaze_for_alignment = (
+            self.qualisys_rec.neon_gaze_resampled[
+                self.qualisys_rec.neon_trim_begin : self.qualisys_rec.neon_trim_end
+            ]
+        )
+
+        neon_offset = time_sync_utils.align_signals(
+            self.qualisys_rec.neon_gaze_for_alignment,
+            self.qualisys_rec.xdf_neon_data_for_alignment,
+            self.qualisys_rec.xdf_gaze_ts_for_alignment,
+        )
+
+        self.qualisys_rec.aligned_gaze_ts = (
+            self.qualisys_rec.neon_reference_timestamps
+            - self.qualisys_rec.neon_reference_timestamps[0]
+        ) + self.qualisys_rec.xdf_gaze_ts_for_alignment[
+            neon_offset - self.qualisys_rec.neon_trim_begin
+        ]
+
+        self.neon_axes.plot(
+            self.qualisys_rec.xdf_gaze_ts_for_alignment,
+            self.qualisys_rec.xdf_neon_data_for_alignment,
+        )
+
+        self.neon_axes.plot(
+            self.qualisys_rec.aligned_gaze_ts,
+            self.qualisys_rec.neon_reference_gaze,
+        )
+
+        # mid_idx = len(self.qualisys_rec.aligned_gaze_ts) // 2
+        # mid_ts = self.qualisys_rec.aligned_gaze_ts[mid_idx]
+        # self.neon_axes.set_xlim(mid_ts - 10, mid_ts + 10)
+        self.neon_axes.set_ylim(
+            np.min(self.qualisys_rec.neon_reference_gaze),
+            np.max(self.qualisys_rec.neon_reference_gaze),
+        )
+
+        self.neon_canvas.draw()
+
+    def prepare_export_column(self):
+        self.export_button = QPushButton("Export Synced Data")
+        self.exported_label = QLabel("")
+
+        self.export_button.clicked.connect(self.export_data)
+
+        self.button_layout = QVBoxLayout()
+        self.button_layout.addWidget(self.export_button)
+        self.button_layout.addWidget(self.exported_label)
+
+        self.main_layout.addLayout(self.button_layout)
+
+    @Slot()
+    def export_data(self):
+        self.exported_label.setText("Exporting data...")
+
+        self.export_mocap_neon_synced_csv()
+        self.export_gaze_time_in_mocap_time()
+        self.export_imu_in_xdf_time()
+
+        self.exported_label.setText("Data export finished!")
+
+        neon_rec_path_file = self.mat_export_dir / (
+            Path(self.qualisys_rec.mat_path).stem + "_neon_rec_path.txt"
+        )
+        neon_rec_path_file.write_text(self.qualisys_rec.neon_rec_path)
+
+    def export_mocap_neon_synced_csv(self):
+        marker_df = pd.DataFrame()
+        marker_df["timestamp [ns]"] = self.qualisys_rec.neon_rec.gaze.time
+        for marker_name in self.qualisys_rec.marker_names:
+            marker = str(marker_name[0])
+            index = self.qualisys_rec.marker_indices[marker]
+
+            marker_pos = self.qualisys_rec.qtm_marker_positions[index].squeeze()
+
+            if marker_pos.shape[1] == 4:
+                marker_pos = marker_pos.T
+
+            # re-interpolate qtm data to correspond exactly to neon data
+
+            fx = interp1d(
+                self.qualisys_rec.aligned_qtm_ts,
+                marker_pos[0, :],
+                bounds_error=False,
+                fill_value=np.nan,
+            )
+            fy = interp1d(
+                self.qualisys_rec.aligned_qtm_ts,
+                marker_pos[1, :],
+                bounds_error=False,
+                fill_value=np.nan,
+            )
+            fz = interp1d(
+                self.qualisys_rec.aligned_qtm_ts,
+                marker_pos[2, :],
+                bounds_error=False,
+                fill_value=np.nan,
+            )
+
+            marker_pos_x_in_neon = fx(self.qualisys_rec.aligned_gaze_ts)
+            marker_pos_y_in_neon = fy(self.qualisys_rec.aligned_gaze_ts)
+            marker_pos_z_in_neon = fz(self.qualisys_rec.aligned_gaze_ts)
+
+            marker_df[f"{marker}_X"] = list(marker_pos_x_in_neon)
+            marker_df[f"{marker}_Y"] = list(marker_pos_y_in_neon)
+            marker_df[f"{marker}_Z"] = list(marker_pos_z_in_neon)
+
+        marker_df.to_csv(
+            self.mat_export_dir
+            / (
+                str(Path(self.qualisys_rec.mat_path).stem)
+                + "_marker_positions_neon_ts.csv"
+            )
+        )
+
+    def export_gaze_time_in_mocap_time(self):
+        # map neon gaze timestamps to mocap time axis for later processing
+
+        # find the subset of gaze timestamps in LSL timeline that overlap with the QTM
+        # data
+
+        first_overlapping_gaze_idx = 0
+        if self.qualisys_rec.aligned_qtm_ts[0] >= self.qualisys_rec.aligned_gaze_ts[0]:
+            for idx, elem in enumerate(self.qualisys_rec.aligned_gaze_ts):
+                if self.qualisys_rec.aligned_qtm_ts[0] <= elem:
+                    first_overlapping_gaze_idx = idx
+                    break
+
+        last_overlapping_gaze_idx = len(self.qualisys_rec.aligned_gaze_ts)
+        if (
+            self.qualisys_rec.aligned_qtm_ts[-1]
+            <= self.qualisys_rec.aligned_gaze_ts[-1]
+        ):
+            for idx, elem in enumerate(reversed(self.qualisys_rec.aligned_gaze_ts)):
+                if self.qualisys_rec.aligned_qtm_ts[-1] >= elem:
+                    last_overlapping_gaze_idx = (
+                        len(self.qualisys_rec.aligned_gaze_ts) - idx - 1
+                    )
+                    break
+
+        gaze_time_in_qtm_xdf = self.qualisys_rec.aligned_gaze_ts[
+            first_overlapping_gaze_idx:last_overlapping_gaze_idx
+        ]
+        gaze_time_in_qtm = gaze_time_in_qtm_xdf - self.qualisys_rec.aligned_qtm_ts[0]
+
+        fig, ax = plt.subplots()
+        ax.plot(
+            self.qualisys_rec.aligned_qtm_ts,
+            self.qualisys_rec.qtm_reference_positions[0, :],
+            label="QTM Aligned Data",
+        )
+        ax.plot(
+            self.qualisys_rec.aligned_gaze_ts,
+            self.qualisys_rec.neon_reference_gaze,
+            label="Gaze Aligned Datr",
+        )
+        plt.xlabel("Time [s]")
+        plt.ylabel("Data [a.u.]")
+        plt.title("Synced Gaze and MoCap Data")
+        plt.legend()
+        plt.show()
+
+        gaze_timing_data = {
+            "first_overlapping_gaze_idx": first_overlapping_gaze_idx,
+            "last_overlapping_gaze_idx": last_overlapping_gaze_idx,
+            "first_overlapping_gaze_xdf_timestamp": self.qualisys_rec.aligned_gaze_ts[
+                first_overlapping_gaze_idx
+            ],
+            "last_overlapping_gaze_xdf_timestamp": self.qualisys_rec.aligned_gaze_ts[
+                last_overlapping_gaze_idx - 1
+            ],
+            "overlapping_gaze_time_in_xdf": gaze_time_in_qtm_xdf,
+            "overlapping_gaze_time_in_qualisys": gaze_time_in_qtm,
+            "first_qtm_xdf_timestamp": self.qualisys_rec.aligned_qtm_ts[0],
+            "gaze_time_in_xdf": self.qualisys_rec.aligned_gaze_ts,
+        }
+
+        pkl_path = Path(self.xdf_export_dir) / (
+            Path(self.qualisys_rec.mat_path).stem + "_gaze_timing_data.pkl"
+        )
+        with open(pkl_path, "wb") as f:
+            pickle.dump(gaze_timing_data, f)
+
+    def export_imu_in_xdf_time(self):
+        f_imu_time = interp1d(
+            self.qualisys_rec.neon_rec.gaze.time,
+            self.qualisys_rec.aligned_gaze_ts,
+            bounds_error=False,
+            fill_value=np.nan,
+        )
+
+        imu_time_in_xdf = f_imu_time(self.qualisys_rec.neon_rec.imu.time)
+        np.save(
+            self.xdf_export_dir
+            / (str(Path(args["mocap_mat_path"]).stem) + "_imu_time_in_xdf.npy"),
+            imu_time_in_xdf,
+        )
 
 
-def align_signals(
-    x: npt.NDArray[np.float64],
-    y: npt.NDArray[np.float64],
-    y_ts: npt.NDArray[np.float64],
-) -> tuple[npt.NDArray[np.float64], list[int], np.signedinteger]:
-    if np.isnan(x).any():
-        x[np.isnan(x)] = np.nanmean(x)
+if __name__ == "__main__":
+    # parse args
 
-    if np.isnan(y).any():
-        y[np.isnan(y)] = np.nanmean(y)
-
-    # x_norm = normalize(x)
-    # y_norm = normalize(y)
-
-    n = len(x)
-
-    windows = sliding_window_view(y, n)
-    sq_diff = np.sum((windows - x) ** 2, axis=1)
-
-    # max_corr_idx = np.argmax(np.correlate(y, x, mode="valid"))
-    max_corr_idx = np.argmin(sq_diff)
-
-    x_time_in_y = y_ts[max_corr_idx : (max_corr_idx + len(x))]
-    x_idxs_in_y = list(range(max_corr_idx, (max_corr_idx + len(x))))
-
-    return x_time_in_y, x_idxs_in_y, max_corr_idx
-
-
-# parse args
-
-parser = argparse.ArgumentParser(
-    description="Determines relative position of Neon scene camera in MoCap \
-coordinate system"
-)
-
-parser.add_argument(
-    "-m",
-    "--mocap_mat_path",
-    help="The path to the Qualisys data (MAT file)",
-    required=True,
-)
-parser.add_argument(
-    "-c3", "--c3d_path", help="The path to the Qualisys data (C3D file)", required=True
-)
-parser.add_argument(
-    "-r",
-    "--neon_rec_path",
-    help="The path to the associated Neon recording",
-    required=True,
-)
-parser.add_argument(
-    "-x",
-    "--xdf_path",
-    help="The XDF file produced by LabRecorder of Lab Streaming Layer",
-)
-parser.add_argument(
-    "-o",
-    "--output_path",
-    help="The CSV file path for saving the converted data (in Neon timebase)",
-    default="marker_positions.csv",
-)
-parser.add_argument(
-    "-c",
-    "--config_path",
-    help="A config file containing the parameters that remain constant between \
-sessions.",
-    required=True,
-)
-parser.add_argument(
-    "-tb",
-    "--trim_begin",
-    help="Trim this many datapoints from the beginning of the MoCap data. Can \
-help with syncing streams.",
-)
-parser.add_argument(
-    "-te",
-    "--trim_end",
-    help="Trim this many datapoints from the end of the MoCap data. Can help \
-with syncing streams.",
-)
-
-args = vars(parser.parse_args())
-
-mocap_mat_path = args["mocap_mat_path"]
-xdf_path = args["xdf_path"]
-neon_rec_path = args["neon_rec_path"]
-c3d_path = args["c3d_path"]
-output_path = args["output_path"]
-
-config = []
-with open(args["config_path"]) as f:
-    config = json.load(f)
-
-# load qualisys data
-
-data = sio.loadmat(mocap_mat_path)
-xdf_data = pyxdf.load_xdf(xdf_path)
-c3d_data = c3d(c3d_path)
-
-# load neon data
-
-neon_rec = plnr.open(neon_rec_path)
-
-# extract relevant marker positions from mocap data
-
-condition_name = list(data.keys())[-1]
-try:
-    marker_positions = data[condition_name][0][0][5][0][0][0][0][0][2]
-except Exception:
-    marker_positions = data[condition_name][0][0][6][0][0][0][0][0][2]
-
-nsamples = marker_positions.shape[2]
-
-# Indices of relevant markers in marker_positions array
-
-try:
-    marker_names = data[condition_name][0][0][5][0][0][0][0][0][1][0]
-except Exception:
-    marker_names = data[condition_name][0][0][6][0][0][0][0][0][1][0]
-
-marker_indices = {str(name[0]): idx for idx, name in enumerate(marker_names)}
-
-# timesync with neon data
-
-reference_positions = marker_positions[
-    marker_indices[config["qualisys_reference_marker"]]
-].squeeze()
-
-trim_begin = int(args["trim_begin"]) if args["trim_begin"] else 0
-trim_end = -int(args["trim_end"]) if args["trim_end"] else len(reference_positions)
-
-if reference_positions.shape[1] == 4:
-    reference_positions = reference_positions.T
-
-reference_duration = reference_positions.shape[-1] / 200
-reference_timestamps = np.arange(0, reference_duration, 1 / 200)
-
-qualisys_xdf_idx = -1
-neon_xdf_idx = -1
-for idx, channel in enumerate(xdf_data[0]):
-    if channel["info"]["name"][0] == "Qualisys":
-        qualisys_xdf_idx = idx
-    elif channel["info"]["name"][0] == "Neon Companion_Neon Gaze":
-        neon_xdf_idx = idx
-
-
-reference_xdf_data_idx = -1
-for idx, channel in enumerate(
-    xdf_data[0][qualisys_xdf_idx]["info"]["desc"][0]["channels"][0]["channel"]
-):
-    if config["qualisys_reference_marker"] in channel["label"][0]:
-        reference_xdf_data_idx = idx
-        break
-
-
-reference_timestamps_xdf = xdf_data[0][qualisys_xdf_idx]["time_stamps"]
-reference_positions_xdf = (
-    xdf_data[0][qualisys_xdf_idx]["time_series"][
-        :, reference_xdf_data_idx : reference_xdf_data_idx + 3
-    ].squeeze()
-    * 1000
-)  # convert to millimeters
-
-# determine which part of QTM data the LSL recording corresponds
-# to via cross-correlation alignment
-
-time_qtm_in_xdf, idxs_qtm_in_xdf, qtm_offset = align_signals(
-    reference_positions[0, trim_begin:trim_end].squeeze(),
-    reference_positions_xdf[:, 0].squeeze(),
-    reference_timestamps_xdf,
-)
-
-qtm_start_in_xdf = qtm_offset - trim_begin
-qtm_end_in_xdf = qtm_start_in_xdf + len(reference_positions[0, :].squeeze())
-full_time_qtm_in_xdf = reference_timestamps_xdf[qtm_start_in_xdf:qtm_end_in_xdf]
-
-plt.plot(reference_timestamps_xdf, reference_positions_xdf[:, 0].squeeze())
-plt.plot(
-    full_time_qtm_in_xdf,
-    # reference_positions[
-    #     0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
-    # ].squeeze(),
-    reference_positions[0, : len(full_time_qtm_in_xdf)].squeeze(),
-)
-plt.show()
-
-# determine offset between neon and LSL recording via
-# cross-correlation alignment
-
-time_gaze_in_xdf, idxs_gaze_in_xdf, neon_offset = align_signals(
-    neon_rec.gaze.data["point_x"],
-    xdf_data[0][neon_xdf_idx]["time_series"][:, 0],
-    xdf_data[0][neon_xdf_idx]["time_stamps"],
-)
-
-plt.plot(
-    xdf_data[0][neon_xdf_idx]["time_stamps"],
-    xdf_data[0][neon_xdf_idx]["time_series"][:, 0],
-)
-plt.plot(
-    time_gaze_in_xdf[: len(neon_rec.gaze.data["point_x"])],
-    neon_rec.gaze.data["point_x"],
-)
-plt.show()
-
-time_gaze_in_xdf = time_gaze_in_xdf[: len(neon_rec.gaze.data["point_x"])]
-
-plt.plot(
-    full_time_qtm_in_xdf,
-    # reference_positions[
-    #     0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
-    # ].squeeze(),
-    reference_positions[0, : len(full_time_qtm_in_xdf)].squeeze(),
-)
-plt.plot(time_gaze_in_xdf, neon_rec.gaze.data["point_x"])
-plt.show()
-
-# marker_positions = marker_positions[
-#     :, :, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :
-# ]
-marker_positions = marker_positions[:, :, : len(full_time_qtm_in_xdf)]
-
-# make dataframe to export as csv
-
-marker_df = pd.DataFrame()
-marker_df["timestamp [ns]"] = neon_rec.gaze.time
-# for marker in config["apriltag_marker_labels"] + config["neon_marker_labels"]:
-for marker_name in marker_names:
-    marker = str(marker_name[0])
-    index = marker_indices[marker]
-
-    marker_pos = marker_positions[index].squeeze()
-    # marker_pos = marker_pos[:, trim_begin:trim_end]
-
-    if marker_pos.shape[1] == 4:
-        marker_pos = marker_pos.T
-
-    # re-interpolate qtm data to correspond exactly to neon data
-
-    fx = interp1d(
-        full_time_qtm_in_xdf,
-        marker_pos[0, :],
-        bounds_error=False,
-        fill_value=np.nan,
+    parser = argparse.ArgumentParser(
+        description="Converts Qualisys MoCap data to a time-synced CSV file."
     )
-    fy = interp1d(
-        full_time_qtm_in_xdf,
-        marker_pos[1, :],
-        bounds_error=False,
-        fill_value=np.nan,
+
+    parser.add_argument(
+        "-m",
+        "--mocap_mat_path",
+        help="The path to the Qualisys data (MAT file)",
+        required=True,
     )
-    fz = interp1d(
-        full_time_qtm_in_xdf,
-        marker_pos[2, :],
-        bounds_error=False,
-        fill_value=np.nan,
+    parser.add_argument(
+        "-r",
+        "--neon_rec_path",
+        help="The path to the associated Neon Native Recording Data",
+        required=True,
+    )
+    parser.add_argument(
+        "-x",
+        "--xdf_path",
+        required=True,
+        help="The XDF file produced by LabRecorder of Lab Streaming Layer",
+    )
+    parser.add_argument(
+        "-c",
+        "--config_path",
+        help="A config file containing the parameters that remain constant between \
+    sessions.",
+        required=True,
     )
 
-    marker_pos_x_in_neon = fx(time_gaze_in_xdf)
-    marker_pos_y_in_neon = fy(time_gaze_in_xdf)
-    marker_pos_z_in_neon = fz(time_gaze_in_xdf)
+    args = vars(parser.parse_args())
 
-    marker_df[f"{marker}_X"] = list(marker_pos_x_in_neon)
-    marker_df[f"{marker}_Y"] = list(marker_pos_y_in_neon)
-    marker_df[f"{marker}_Z"] = list(marker_pos_z_in_neon)
+    mocap_mat_path = args["mocap_mat_path"]
+    xdf_path = args["xdf_path"]
+    neon_rec_path = args["neon_rec_path"]
+    config_path = args["config_path"]
 
-# export csv
-
-marker_df.to_csv(output_path)
-
-# re-interpolate neon data to correspond exactly to qtm timestamps
-
-if neon_rec.calibration is not None:
-    gaze_3d = unproject_points(
-        neon_rec.gaze.data[["point_x", "point_y"]],
-        neon_rec.calibration.scene_camera_matrix,
-        neon_rec.calibration.scene_distortion_coefficients,
-        normalize=True,
+    qualisys_rec = data_loader.QualisysRecording(
+        xdf_path,
+        None,
+        mocap_mat_path,
+        neon_rec_path,
+        config_path,
     )
-else:
-    raise ValueError("Recording has no camera calibration data.")
 
-f_gaze_x = interp1d(
-    time_gaze_in_xdf,
-    gaze_3d[:, 0].squeeze(),
-    bounds_error=False,
-    fill_value=np.nan,
-)
-f_gaze_y = interp1d(
-    time_gaze_in_xdf,
-    gaze_3d[:, 1].squeeze(),
-    bounds_error=False,
-    fill_value=np.nan,
-)
-f_gaze_z = interp1d(
-    time_gaze_in_xdf,
-    gaze_3d[:, 2].squeeze(),
-    bounds_error=False,
-    fill_value=np.nan,
-)
+    mat_export_dir = Path(mocap_mat_path).parent
+    xdf_export_dir = Path(xdf_path).parent
 
-gaze_x_in_qtm = f_gaze_x(time_qtm_in_xdf)
-gaze_y_in_qtm = f_gaze_y(time_qtm_in_xdf)
-gaze_z_in_qtm = f_gaze_z(time_qtm_in_xdf)
-
-gaze_xyz_in_qtm = np.column_stack([gaze_x_in_qtm, gaze_y_in_qtm, gaze_z_in_qtm])
-
-# export C3D file with synced neon data
-
-# make a new c3d_data file based on the original
-
-c3d_points = c3d_data["data"]["points"]
-nframes_qtm = c3d_points.shape[2]
-
-gaze_for_c3d = np.zeros(
-    (4, 1, nframes_qtm),
-    dtype=float,
-)
-
-# homogeneous coordinates
-gaze_for_c3d[0, 0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :] = (
-    gaze_xyz_in_qtm[:, 0]
-)  # X
-gaze_for_c3d[1, 0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :] = (
-    gaze_xyz_in_qtm[:, 1]
-)  # Y
-gaze_for_c3d[2, 0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :] = (
-    gaze_xyz_in_qtm[:, 2]
-)  # Z
-gaze_for_c3d[3, 0, len(reference_positions[0, :]) - len(time_qtm_in_xdf) :] = 1.0  # W
-
-c3d_points_new = np.concatenate([c3d_points, gaze_for_c3d], axis=1)
-c3d_data["data"]["points"] = c3d_points_new
-
-params = c3d_data["parameters"]
-
-labels = list(params["POINT"]["LABELS"]["value"])
-labels.append("Gaze-3D-Vector")
-params["POINT"]["LABELS"]["value"] = labels
-
-if "LONG_NAMES" in params["POINT"]:
-    long_names = list(params["POINT"]["LONG_NAMES"]["value"])
-    long_names.append("Gaze-3D-Vector")
-    params["POINT"]["LONG_NAMES"]["value"] = long_names
-
-params["POINT"]["USED"]["value"] = [c3d_points_new.shape[1]]
-
-# make dummy residuals and camera_masks for the gaze data
-c3d_meta = c3d_data["data"]["meta_points"]
-c3d_meta_new = {}
-c3d_meta_new["residuals"] = np.concatenate(
-    [c3d_meta["residuals"], np.ones((1, 1, nframes_qtm))], axis=1
-)
-c3d_meta_new["camera_masks"] = np.concatenate(
-    [c3d_meta["camera_masks"], np.zeros((7, 1, nframes_qtm), dtype=np.bool)], axis=1
-)
-c3d_data["data"]["meta_points"] = c3d_meta_new
-
-c3d_data.write("mocap_with_gaze.c3d")
-print("Wrote mocap_with_gaze.c3d")
+    app = QApplication(sys.argv)
+    window = MainWindow(qualisys_rec, mat_export_dir, xdf_export_dir)
+    window.show()
+    sys.exit(app.exec())

@@ -1,10 +1,17 @@
 {
   "qualisys_reference_marker": "",
+  "qualisys_frame_rate": 200,
+  "vicon_start_event_name": "",
+  "vicon_end_event_name": "",
+  "neutral_heading": [0, 1, 0],
   "T_neon_to_mocap": [
     [1, 0, 0],
     [0, 1, 0],
     [0, 0, 1]
   ],
+  "flip_gaze_x": false,
+  "flip_gaze_y": false,
+  "flip_gaze_z": false,
   "apriltag_black_side_length": 0.123,
   "ir_marker_radius": 0.006,
   "apriltag_pattern_width": 0.6,

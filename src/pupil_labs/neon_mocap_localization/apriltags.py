@@ -10,14 +10,12 @@ from pupil_labs.neon_mocap_localization.pose import Pose
 class AprilTags:
     def __init__(
         self,
-        detector: Detector,
+        detector: Detector,  # type: ignore
         neon: Neon,
         tag_size: float,
         img: npt.NDArray[np.uint8],
         tag_corner_coordinates: dict[str, npt.NDArray[np.float64]],
         apriltags_to_use: list[str],
-        surface_gaze_object_pts: npt.NDArray[np.floating] | None = None,
-        surface_gaze_image_pts: npt.NDArray[np.floating] | None = None,
     ):
         self.detector = detector
         self.K = neon.camera_matrix
@@ -26,14 +24,8 @@ class AprilTags:
         self.tag_corner_coordinates = tag_corner_coordinates
         self.apriltags_to_use = apriltags_to_use
 
-        self.surface_gaze_object_pts = surface_gaze_object_pts
-        self.surface_gaze_image_pts = surface_gaze_image_pts
-
         self.good_detection = False
         self.error = np.inf
-
-        # self.pose = None
-        # self.undist_frame = None
 
         self.detect_tags_and_extract_pose(img)
 
@@ -70,7 +62,7 @@ class AprilTags:
             self.good_detection = False
             return
 
-        if len(self.at_detection) < len(self.apriltags_to_use):  # type: ignore
+        if len(self.at_detection) < len(self.apriltags_to_use):
             self.good_detection = False
             return
 
@@ -78,7 +70,7 @@ class AprilTags:
 
         at_tag_pts = np.zeros((len(self.apriltags_to_use), 4, 2), dtype=np.float32)
         c = 0
-        for detection in self.at_detection:  # type: ignore
+        for detection in self.at_detection:
             if str(detection.tag_id) in self.apriltags_to_use:
                 # at_tag_pts[str(detection.tag_id)] = detection.corners
                 at_tag_pts[c] = detection.corners
@@ -96,25 +88,13 @@ class AprilTags:
         image_pts = at_tag_pts.reshape(-1, 2)
         object_pts_np = object_pts_np.reshape(-1, 3)
 
-        if (
-            self.surface_gaze_image_pts is not None
-            and self.surface_gaze_object_pts is not None
-        ):
-            ok, tag_rotation, tag_position, error = cv2.solvePnPGeneric(
-                objectPoints=self.surface_gaze_object_pts,
-                imagePoints=self.surface_gaze_image_pts,
-                cameraMatrix=self.new_K,
-                distCoeffs=self.D,
-                flags=cv2.SOLVEPNP_IPPE,
-            )
-        else:
-            ok, tag_rotation, tag_position, error = cv2.solvePnPGeneric(
-                objectPoints=object_pts_np,
-                imagePoints=image_pts,
-                cameraMatrix=self.new_K,
-                distCoeffs=zeroed_D,
-                flags=cv2.SOLVEPNP_IPPE,
-            )
+        ok, tag_rotation, tag_position, error = cv2.solvePnPGeneric(
+            objectPoints=object_pts_np,
+            imagePoints=image_pts,
+            cameraMatrix=self.new_K,
+            distCoeffs=zeroed_D,
+            flags=cv2.SOLVEPNP_IPPE,
+        )
 
         if not ok:
             self.good_detection = False
